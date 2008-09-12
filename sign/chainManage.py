@@ -1,7 +1,6 @@
 #custom imports
 from cUtil import Cutil
 from cert import X509Man
-from digest.Hasher import DigestMan
 
 
 #3rd party
@@ -138,23 +137,11 @@ class chainMan(object):
         else:
             return None
         
-    def get_hash_list(self):
-        """ That method is needed when we look for a specific cert if it is 
-        in the db so we need their hash list"""
-        hash_list=[]
-        #from root to client
-        for cert in self.__cert_stack:
-            tempCert=X509Man(cert[2])
-            hash_list.append(DigestMan.gen_buf_hash(tempCert.get_cert_text()))
-            
-            del tempCert
-        
-        
-        return hash_list 
+ 
             
 if __name__=="__main__":
     c=chainMan()
-    c.load_chain(["chain/cacert.pem","chain/cert1.pem","chain/cert2.pem"])
+    c.load_chain(["/home/makkalot/my-svns/old_imza/imzaci/chain/cert1.pem","/home/makkalot/my-svns/old_imza/imzaci/chain/cert2.pem"])
     print c.create_chain()
     #print c.get_hash_list()
     #Test with the stack
