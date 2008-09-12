@@ -1,0 +1,7 @@
+TODO LIST :
+
+1)Write unit tests for tool
+2)Handle M2Crypto exceptions in more user friendly way
+3)Test it with different certficates (UEKAE ex)
+4)Make some optimizaitons in hashing and chain creating.
+5)Try to integrate it with pisi (test one)
