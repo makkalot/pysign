@@ -8,7 +8,7 @@ import string
 
 
 
-class X509Man(object):
+class X509Cert(object):
     """ Makes the X509 structure more useful for the purpose"""
     
     def __init__(self,thecert=None):
@@ -41,7 +41,12 @@ class X509Man(object):
         """ Sets the global cert object from outside the class"""
         self.cert=certObj
         
-        
+    def cert_hash(self):
+        """
+        It is all of the certs hash
+        """
+        return str(self.cert.get_fingerprint("sha1"))
+
     def list_info(self,tam=None):
         """ Lists some info about the cert"""
         if tam:
@@ -71,20 +76,10 @@ class X509Man(object):
         print "Certificate saved to :",fname
         
 
-    def gPubkey(self):
+    def get_public_key(self):
         """ Return Back the certs public key"""
-        #print self.cert.get_pubkey()
         self.pkey=self.cert.get_pubkey()
-        self.buffer=MemoryBuffer()
-        
-        #print self.pkey
-        self.pkey.save_key_bio(self.buffer, cipher=None)
-        self.pub=self.buffer.read()
-        
-        #Because the default is PRIVATE even if it is public
-        self.pub=string.replace(self.pub, "PRIVATE", "PUBLIC")
-        
-        return self.pub
+        return self.pkey
     
     def cert_detail(self,detailObj):
         """ It is passed a XNAME object"""
@@ -132,6 +127,7 @@ class X509Man(object):
         
         #Get rid off GMT thing
         self.expDate=string.replace(self.expDate, "GMT", "").strip()
+        self.expDate=string.replace(self.expDate, "UTC", "").strip()
         #print self.expDate
         
         #Convert to a valid type for easy comparison
@@ -159,6 +155,8 @@ class X509Man(object):
             
         elif tip=="issuer":
             xn=self.cert.get_issuer()
+        else:
+            return None
     
         return xn #XName Object
     
@@ -221,29 +219,68 @@ class X509Man(object):
             return self.cert.as_der()
         
     
-    def check_sum(self):
-        """ Checks if the cert has been modified for any reasons"""
-        if self.cert.verify()==0:
-            #print "Hash is valid"
-            return True
+    def verify_issuer(self,issuer_public_key):
+        """
+        That method checks if its signature when
+        is decrypted by public key of the issuer
+        will give us the fingerprint of that cert
+        A very useful method to check if some other cert
+        is the issuer of that ! (in chain validation)
+        """
+        result =  self.cert.verify(issuer_public_key)
+        #ah it is C style :)
+        if result == 0:
+            return False
         else:
-            print "The cert has been modified"
-            return False 
+            return True
+
+    def __cmp__(self,other_cert):
+        """
+        Compare if two certs are the same
+        """
+        #first check if the subject fields are same
+        #second check if the issuer info is same
+        #third check the fingerprints --it is the exact match --
+        if not str(self.person_info("issuer")) == str(other_cert.person_info("issuer")):
+            print "Mismatch in issuer fields between 2 certs"
+            return -1
         
+        if not str(self.person_info("subject")) == str(other_cert.person_info("subject")):
+            print "Mismatch in subject fields between 2 certs"
+            return -1
+
+        if not self.cert_hash() == other_cert.cert_hash():
+            print "The hashes of 2 certs are not same"
+            return -1
+
+        #if you pass all you pass the exam :)
+        return 0
+
+
 
 if __name__=="__main__":
-    #cert=x.load_cert("chain/cert1.pem")
-    #s=X509Man(cert)
-    s=X509Man()
+    cert=x.load_cert("/home/makkalot/my-svns/old_imza/imzaci/chain/cert1.pem")
+    s=X509Cert(cert)
+    
+    #load its parent to see if it is ok ?
+    cert2=x.load_cert("/home/makkalot/my-svns/old_imza/imzaci/chain/cacert.pem")
+    cert_parent = X509Cert(cert2)
+    print "Verify that ??"
+    print s.verify_issuer(cert_parent.gPubkey())
+    print s == cert_parent
+
+    #s=X509Man()
     
     #s.list_info()
+   
     #print s.gPubkey()
     #s.store_tofile("bisi.pem")
-    #s.is_valid()
+    #print s.is_valid()
     #print s.get_cert_text()
     #print s.check_sum()
     #print s.person_info()
     #s.get_detail("issuer")
     #print s.get_date_info()
-    
+    #print s.cert.get_subject() 
+    #print s.cert.get_issuer()
     
