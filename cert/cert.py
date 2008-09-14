@@ -217,6 +217,19 @@ class X509Cert(object):
             return self.cert.as_pem()
         elif format==1:
             return self.cert.as_der()
+
+    def is_ca(self):
+        """
+        A simple wrapper method for check_ca because 
+        it returns some error codes which are not very
+        Pythonic .. if it is return True else False
+        """
+
+        if self.cert.check_ca() == 0:
+            return False
+        else:
+            return True
+
         
     
     def verify_issuer(self,issuer_public_key):
@@ -259,16 +272,19 @@ class X509Cert(object):
 
 
 if __name__=="__main__":
-    cert=x.load_cert("/home/makkalot/my-svns/old_imza/imzaci/chain/cert1.pem")
+    cert=x.load_cert("/home/makkalot/my-svns/old_imza/imzaci/chain/cert2.pem")
     s=X509Cert(cert)
     
     #load its parent to see if it is ok ?
     cert2=x.load_cert("/home/makkalot/my-svns/old_imza/imzaci/chain/cacert.pem")
     cert_parent = X509Cert(cert2)
     print "Verify that ??"
-    print s.verify_issuer(cert_parent.gPubkey())
+    print s.verify_issuer(cert_parent.get_public_key())
     print s == cert_parent
 
+    print "Control to see if it is a CA"
+    print s.cert.check_ca()
+    print cert_parent.cert.check_ca()
     #s=X509Man()
     
     #s.list_info()
