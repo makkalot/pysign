@@ -19,7 +19,7 @@ def run_ssl_command(run_string):
             )
     cmd.wait()
     
-def create_new_request(private_key_file=None,request_file=None,days=None):
+def create_new_request(create_new_dir=None,private_key_file=None,request_file=None,days=None):
     """
     New request 
     """
@@ -30,10 +30,49 @@ def create_new_request(private_key_file=None,request_file=None,days=None):
     if not days:
         days = "365"
 
-    run_string = "req -config %s -new -keyout %s -out %s -days %s"%(SSL_CONF,private_key_file,request_file,days)
+    if create_new_dir:
+        #create some stuff it is more tidy that way
+        import os
+        os.mkdir(MY_STORE+"/"+create_new_dir)
+        os.mkdir(MY_STORE+"/"+create_new_dir+"/"+"private")
+    if not create_new_dir:
+        run_string = "req -config %s -new -keyout %s -out %s -days %s"%(SSL_CONF,private_key_file,request_file,days)
+    else:
+        run_string = "req -config %s -new -keyout %s/private/%s -out %s/%s -days %s"%(SSL_CONF,create_new_dir,private_key_file,create_new_dir,request_file,days)
+        
     run_ssl_command(run_string.strip())
-    print "The request is saved under :%s "%(MY_STORE+"/"+request_file)
-    print "The private key is under :%s "%(MY_STORE+"/"+private_key_file)
+    if not create_new_dir:
+        print "The request is saved under :%s "%(MY_STORE+"/"+request_file)
+        print "The private key is under :%s "%(MY_STORE+"/"+private_key_file)
+    else:
+        print "The request is saved under :%s "%(MY_STORE+"/"+create_new_dir+"/"+request_file)
+        print "The private key is under :%s "%(MY_STORE+"/"+create_new_dir+"/private/"+private_key_file)
+
+
+def initialize_ca_dir(ca_path):
+    """
+    Some dummy initialization stuff
+    """
+    import os
+
+    if not os.path.exists(ca_path):
+        os.mkdir(ca_path)
+    if not os.path.exists(ca_path+"/newcerts"):
+        os.mkdir(ca_path+"/newcerts")
+    if not os.path.exists(ca_path+"/private"):
+        os.mkdir(ca_path+"/private")
+    if not os.path.exists(ca_path+"/crl"):
+        os.mkdir(ca_path+"/crl")
+    if not os.path.exists(ca_path+"/certs"):
+        os.mkdir(ca_path+"/certs")
+    if not os.path.exists(ca_path+"index.txt"):
+        tmp=open(ca_path+"/index.txt","w")
+        tmp.close()
+    if not os.path.exists(ca_path+"/serial"):
+        tmp=open(ca_path+"/serial","w")
+        tmp.write("00")
+        tmp.close()
+
 
 def create_new_ca(ca_key_name=None,ca_days=None,ca_cert=None):
     """
@@ -58,16 +97,7 @@ def create_new_ca(ca_key_name=None,ca_days=None,ca_cert=None):
         return
     else:
         #some initializations
-        os.mkdir(ca_path)
-        os.mkdir(ca_path+"/newcerts")
-        os.mkdir(ca_path+"/private")
-        os.mkdir(ca_path+"/crl")
-        os.mkdir(ca_path+"/certs")
-        tmp=open(ca_path+"/index.txt","w")
-        tmp.close()
-        tmp=open(ca_path+"/serial","w")
-        tmp.write("00")
-        tmp.close()
+        initialize_ca_dir(ca_path)  
     #set the conf file for that CA in its own place
     if not set_ssl_cnf(dir_name,ca_cert,ca_key_name):
         print "Error during setting the eocnfiguration file for CA"
@@ -83,15 +113,16 @@ def create_new_ca(ca_key_name=None,ca_days=None,ca_cert=None):
     run_ssl_command(request_string)
 
     #then create the self signed cert here
-    ca_string = "".join([CA," -out ",ca_path,"/",ca_cert," -days ",ca_days," -batch -keyfile ",ca_path,"/private/",ca_key_name," -selfsign -infiles ",ca_path,"/","ca-req.pem"])
+    ca_string = "".join([CA," -out ",ca_path,"/",ca_cert," -days ",ca_days," -notext -batch -keyfile ",ca_path,"/private/",ca_key_name," -selfsign -infiles ",ca_path,"/","ca-req.pem"])
     run_ssl_command(ca_string)
   
-def sign_cert(ca_dir_name,request_cert,ca_key_name=None,ca_cert_name=None,days=None,signed_cert=None):
+def sign_cert(ca_dir_name,request_cert,sign_CA=False,ca_key_name=None,ca_cert_name=None,days=None,req_dir=None,signed_cert=None):
     """
     Signs a request cert 
     """
     import os
 
+    
     #santy checks hereeee
     if not ca_key_name:
         ca_key_name = "ca-private.pem"
@@ -105,10 +136,17 @@ def sign_cert(ca_dir_name,request_cert,ca_key_name=None,ca_cert_name=None,days=N
     if not signed_cert:
         signed_cert = "signed-cert.pem"
     
+    #Am i an intermediate CA ?
+    if not os.path.exists(MY_STORE+"/ca_dir_name/"+SSL_CONF):
+        set_ssl_cnf(ca_dir_name,ca_cert_name,ca_key_name)
+
     ca_path = "".join([MY_STORE,"/",ca_dir_name])
     #here may do sth different later ... like ccheck current dir and etc
-    request_cert = "".join([MY_STORE,"/",request_cert])
-
+    if not req_dir:
+        request_cert = "".join([MY_STORE,"/",request_cert])
+    else:
+        request_cert = "".join([MY_STORE,"/",req_dir,"/",request_cert])
+        
     if not os.path.exists(ca_path):
         print "The CA directory you supplied doesnt exists"
         return
@@ -117,8 +155,22 @@ def sign_cert(ca_dir_name,request_cert,ca_key_name=None,ca_cert_name=None,days=N
         print "The request file doesnt exists"
         return
     
+    if not sign_CA:
+        if not req_dir:
+            sign_string="ca -policy policy_anything -config %s/%s -cert %s/%s -in %s -keyfile %s/private/%s -days %s -out %s/%s"%(ca_path,SSL_CONF,ca_path,ca_cert_name,request_cert,ca_path,ca_key_name,days,MY_STORE,signed_cert)
+        else:
+            sign_string="ca -policy policy_anything -config %s/%s -cert %s/%s -in %s -keyfile %s/private/%s -days %s -out %s/%s"%(ca_path,SSL_CONF,ca_path,ca_cert_name,request_cert,ca_path,ca_key_name,days,req_dir,signed_cert)
+    else:
+        #if you want your signed cert to sign other certs 
+        #it is useful when creating chains
+        if not req_dir:
+            sign_string="ca -policy policy_anything -config %s/%s -extensions v3_ca -cert %s/%s -in %s -keyfile %s/private/%s -days %s -out %s/%s"%(ca_path,SSL_CONF,ca_path,ca_cert_name,request_cert,ca_path,ca_key_name,days,MY_STORE,signed_cert)
+        else:
+            sign_string="ca -policy policy_anything -config %s/%s -extensions v3_ca -cert %s/%s -in %s -keyfile %s/private/%s -days %s -out %s/%s"%(ca_path,SSL_CONF,ca_path,ca_cert_name,request_cert,ca_path,ca_key_name,days,req_dir,signed_cert)
+            #it will become a new CA intermediate so initialize its content to be a new CA
+            initialize_ca_dir(MY_STORE+"/"+req_dir)
 
-    sign_string="ca -policy policy_anything -config %s/%s -cert %s/%s -in %s -keyfile %s/private/%s -days %s -out %s/%s"%(ca_path,SSL_CONF,ca_path,ca_cert_name,request_cert,ca_path,ca_key_name,days,MY_STORE,signed_cert)
+
     run_ssl_command(sign_string.strip())
 
 
@@ -170,6 +222,12 @@ def set_ssl_cnf(ca_dir_name,ca_cert,private_key):
     return True
 
 if __name__ == "__main__":
+    #create a child here
+    #create_new_request(create_new_dir="child",private_key_file="child-key.pem",request_file="child-cert.pem")
+    #create en inter here
+    #create_new_request(create_new_dir="inter",private_key_file="inter-key.pem",request_file="inter-cert.pem")
     #create_new_request()
     #create_new_ca()
-    sign_cert("my-ca","newreq.pem")
+    #sign_cert("my-ca","inter-cert.pem",True,req_dir="inter",signed_cert="inter-signed.pem")
+    sign_cert("inter","child-cert.pem",False,ca_key_name="inter-key.pem",ca_cert_name="inter-signed.pem",req_dir="child",signed_cert="inter-signed.pem")
+    #sign_cert(ca_dir_name,request_cert,sign_CA=False,ca_key_name=None,ca_cert_name=None,days=None,req_dir=None,signed_cert=None):
