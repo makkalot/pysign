@@ -74,7 +74,7 @@ def initialize_ca_dir(ca_path):
         tmp.close()
 
 
-def create_new_ca(ca_key_name=None,ca_days=None,ca_cert=None):
+def create_new_ca(dir_name=None,ca_key_name=None,ca_days=None,ca_cert=None):
     """
     Creates a new CA for self signed certs
     """
@@ -88,8 +88,10 @@ def create_new_ca(ca_key_name=None,ca_days=None,ca_cert=None):
     if not ca_days:
         ca_days ="365"
 
-    print "Enter the name of the directory to store the CA :"
-    dir_name = raw_input()
+    if not dir_name:
+        print "Enter the name of the directory to store the CA :"
+        dir_name = raw_input()
+    
     ca_path = "".join([MY_STORE,"/",dir_name])
     
     if os.path.exists(ca_path):
@@ -221,7 +223,36 @@ def set_ssl_cnf(ca_dir_name,ca_cert,private_key):
 
     return True
 
+#That method is for creating the initial Testing Database so it should be run only once 
+def prepare_test_environment():
+    
+    #The structure of that chains will be ca-->inter1-->inter2-->child
+    print "Creating CA press enter to continue ..."
+    tmp=raw_input()
+    create_new_ca(dir_name="my-ca")
+    print "Creating request for inter1 enter to continue"
+    tmp=raw_input()
+    create_new_request(create_new_dir="inter1",private_key_file="inter1-key.pem",request_file="inter1-req.pem")
+    print "Creating request for inter2 enter to continue"
+    tmp=raw_input()
+    create_new_request(create_new_dir="inter2",private_key_file="inter2-key.pem",request_file="inter2-req.pem")
+    print "Creating request for child enter to continue"
+    tmp=raw_input()
+    create_new_request(create_new_dir="child",private_key_file="child-key.pem",request_file="child-req.pem")
+    print "CA signs the request of inter1 which also will be CA"
+    tmp=raw_input()
+    sign_cert("my-ca","inter1-req.pem",True,req_dir="inter1",signed_cert="inter1-cert.pem")
+    
+    print "Inter1 signs the request of inter2 which also will be CA"
+    tmp=raw_input()
+    sign_cert("inter1","inter2-req.pem",True,ca_key_name="inter1-key.pem",ca_cert_name="inter1-cert.pem",req_dir="inter2",signed_cert="inter2-cert.pem")
+    print "Inter2 signs the request of child which will not be a CA"
+    tmp=raw_input()
+    sign_cert("inter2","child-req.pem",False,ca_key_name="inter2-key.pem",ca_cert_name="inter2-cert.pem",req_dir="child",signed_cert="child-cert.pem")
+    print "**** Happpy TESTING *****"
+
 if __name__ == "__main__":
+    prepare_test_environment()
     #create a child here
     #create_new_request(create_new_dir="child",private_key_file="child-key.pem",request_file="child-cert.pem")
     #create en inter here
@@ -229,5 +260,5 @@ if __name__ == "__main__":
     #create_new_request()
     #create_new_ca()
     #sign_cert("my-ca","inter-cert.pem",True,req_dir="inter",signed_cert="inter-signed.pem")
-    sign_cert("inter","child-cert.pem",False,ca_key_name="inter-key.pem",ca_cert_name="inter-signed.pem",req_dir="child",signed_cert="inter-signed.pem")
+    #sign_cert("inter","child-cert.pem",False,ca_key_name="inter-key.pem",ca_cert_name="inter-signed.pem",req_dir="child",signed_cert="inter-signed.pem")
     #sign_cert(ca_dir_name,request_cert,sign_CA=False,ca_key_name=None,ca_cert_name=None,days=None,req_dir=None,signed_cert=None):
