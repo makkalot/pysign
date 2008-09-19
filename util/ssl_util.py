@@ -1,9 +1,14 @@
 import subprocess
+import shelve
+import dbm
+import fcntl
+
 
 MY_STORE = "/home/makkalot/mygits/pysign/imzaci/chain"
 SSL_EXECUTABLE = "openssl"
 SSL_CONF = "openssl.cnf"
 TEMPLATE_CNF = "template.cnf"
+INTERNAL_DB_FILE="internal.db"
 
 def run_ssl_command(run_string):
     """
@@ -47,7 +52,12 @@ def create_new_request(create_new_dir=None,private_key_file=None,request_file=No
     else:
         print "The request is saved under :%s "%(MY_STORE+"/"+create_new_dir+"/"+request_file)
         print "The private key is under :%s "%(MY_STORE+"/"+create_new_dir+"/private/"+private_key_file)
-
+        #create a simple indexdb file to know what is where
+        tmp_dict={
+                'request':request_file,
+                'private':private_key_file
+                }
+        storage=open_internal_db(create_new_dir,"w",tmp_dict)
 
 def initialize_ca_dir(ca_path):
     """
@@ -104,19 +114,28 @@ def create_new_ca(dir_name=None,ca_key_name=None,ca_days=None,ca_cert=None):
     if not set_ssl_cnf(dir_name,ca_cert,ca_key_name):
         print "Error during setting the eocnfiguration file for CA"
         return
-
+    
+    request_file = "ca-req.pem"
     config_place = "".join([ca_path,"/",SSL_CONF])
 
     REQ="req -config %s"%(config_place)
     CA="ca -config %s"%(config_place)
     
     #firstly create a request
-    request_string = "".join([REQ," -new -keyout ",ca_path,"/private/",ca_key_name," -out ",ca_path,"/","ca-req.pem"])            
+    request_string = "".join([REQ," -new -keyout ",ca_path,"/private/",ca_key_name," -out ",ca_path,"/",request_file])            
     run_ssl_command(request_string)
 
     #then create the self signed cert here
-    ca_string = "".join([CA," -out ",ca_path,"/",ca_cert," -days ",ca_days," -notext -batch -keyfile ",ca_path,"/private/",ca_key_name," -selfsign -infiles ",ca_path,"/","ca-req.pem"])
+    ca_string = "".join([CA," -out ",ca_path,"/",ca_cert," -days ",ca_days," -notext -batch -keyfile ",ca_path,"/private/",ca_key_name," -selfsign -infiles ",ca_path,"/",request_file])
     run_ssl_command(ca_string)
+    
+    #wrte those to the our internal DB
+    tmp_dict={
+                'request':request_file,
+                'private':ca_key_name,
+                'cert':ca_cert
+                }
+    storage=open_internal_db(dir_name,"w",tmp_dict)
   
 def sign_cert(ca_dir_name,request_cert,sign_CA=False,ca_key_name=None,ca_cert_name=None,days=None,req_dir=None,signed_cert=None):
     """
@@ -162,6 +181,8 @@ def sign_cert(ca_dir_name,request_cert,sign_CA=False,ca_key_name=None,ca_cert_na
             sign_string="ca -policy policy_anything -config %s/%s -cert %s/%s -in %s -keyfile %s/private/%s -days %s -out %s/%s"%(ca_path,SSL_CONF,ca_path,ca_cert_name,request_cert,ca_path,ca_key_name,days,MY_STORE,signed_cert)
         else:
             sign_string="ca -policy policy_anything -config %s/%s -cert %s/%s -in %s -keyfile %s/private/%s -days %s -out %s/%s"%(ca_path,SSL_CONF,ca_path,ca_cert_name,request_cert,ca_path,ca_key_name,days,req_dir,signed_cert)
+            #store it also into the internal DB
+            open_internal_db(req_dir,"w",{'cert':signed_cert})
     else:
         #if you want your signed cert to sign other certs 
         #it is useful when creating chains
@@ -171,8 +192,10 @@ def sign_cert(ca_dir_name,request_cert,sign_CA=False,ca_key_name=None,ca_cert_na
             sign_string="ca -policy policy_anything -config %s/%s -extensions v3_ca -cert %s/%s -in %s -keyfile %s/private/%s -days %s -out %s/%s"%(ca_path,SSL_CONF,ca_path,ca_cert_name,request_cert,ca_path,ca_key_name,days,req_dir,signed_cert)
             #it will become a new CA intermediate so initialize its content to be a new CA
             initialize_ca_dir(MY_STORE+"/"+req_dir)
+            open_internal_db(req_dir,"w",{'cert':signed_cert})
 
 
+    #run the signing operation
     run_ssl_command(sign_string.strip())
 
 
@@ -223,6 +246,39 @@ def set_ssl_cnf(ca_dir_name,ca_cert,private_key):
 
     return True
 
+def open_internal_db(dir,mode,write_dict=None):
+    """
+    There are 2 modes one r and w
+    """
+    import os
+    if not os.path.exists(dir):
+        filename=os.path.join(MY_STORE,dir,INTERNAL_DB_FILE)
+    else:
+        filename=os.path.join(dir,INTERNAL_DB_FILE)
+
+    try:
+        handle = open(filename,mode)
+    except IOError, e:
+        print 'Cannot create status file. Ensure you have permission to write'
+        return None
+
+    fcntl.flock(handle.fileno(), fcntl.LOCK_EX)
+    internal_db = dbm.open(filename, 'c', 0644 )
+    storage = shelve.Shelf(internal_db)
+    
+    if mode == "w":
+        for key,value in write_dict.iteritems():
+            storage[key]=value
+    elif mode == "r":
+        tmp=dict(storage)
+        #print tmp
+    storage.close()
+    fcntl.flock(handle.fileno(), fcntl.LOCK_UN)
+    if mode == "r":
+        return tmp
+    else:
+        return True
+
 #That method is for creating the initial Testing Database so it should be run only once 
 def prepare_test_environment():
     
@@ -254,7 +310,9 @@ def prepare_test_environment():
 if __name__ == "__main__":
     prepare_test_environment()
     #create a child here
-    #create_new_request(create_new_dir="child",private_key_file="child-key.pem",request_file="child-cert.pem")
+    #create_new_request(create_new_dir="db_test",private_key_file="db-key.pem",request_file="db-cert.pem")
+    #print open_internal_db("db_test","r")
+    #sign_cert("test-ca","db-cert.pem",False,req_dir="db_test",signed_cert="db-signed.pem")
     #create en inter here
     #create_new_request(create_new_dir="inter",private_key_file="inter-key.pem",request_file="inter-cert.pem")
     #create_new_request()
