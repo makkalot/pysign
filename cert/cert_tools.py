@@ -1,6 +1,6 @@
 import glob
 
-from cert import X509Cert
+from imzaci.cert.cert import X509Cert
 from imzaci.util.ssl_util import open_internal_db
 
 """
@@ -32,7 +32,30 @@ def load_chain_from_dirs(list_of_dirs):
     need to scan them. The scanning depth is 1 we dont do
     recursive things because we may have some private keys :)
     """
-    pass
+    chain_place = load_certs_from_dirs(list_of_dirs)
+    if not chain_place:
+        print "No chain to load sorry "
+        return None
+
+    from imzaci.cert.chain_manager import X509ChainManager
+    cm = X509ChainManager() #create an instance
+    load_result = cm.load_chain(chain_place,cm.X509_CERT)
+    if not load_result:
+        print "Some error when loading the chain"
+        return None
+
+    create_result = cm.create_chain()
+    if not create_result:
+        print "The chain can not be constructed sorry "
+        return None
+    
+    #returns back the final valid chain ...
+    #test the final
+    #c=cm.get_final_subject()
+    #c.list_info()
+
+    return cm
+
 
 def load_certs_from_dir(scan_dir):
     """
@@ -41,6 +64,9 @@ def load_certs_from_dir(scan_dir):
     return load_cert_from_dir(scan_dir,get_all=True)
 
 def load_certs_from_dirs(list_of_dirs):
+    """
+    Loads the certs from a list of directories
+    """
     cert_list = []
     for dir in list_of_dirs:
         tmp_cert=load_cert_from_dir(dir)
@@ -72,7 +98,7 @@ def load_cert_from_dir(scan_dir,get_all=False):
             cert_path = os.path.join(scan_dir,store['cert'])
             try:
                 tmp = x.load_cert(cert_path)
-                print "Loaded cert :",store['cert']
+                #print "Loaded cert :",store['cert']
                 return X509Cert(tmp)
             except:
                 #print "Error when loading ",store['cert']
