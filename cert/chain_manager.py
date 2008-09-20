@@ -1,8 +1,6 @@
 #custom imports
 from cUtil import Cutil
-from cert import X509Man
-
-
+from imzaci.cert.cert import X509Cert
 #3rd party
 from M2Crypto import X509 
 
