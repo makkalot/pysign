@@ -119,7 +119,7 @@ def create_new_ca(dir_name=None,ca_key_name=None,ca_days=None,ca_cert=None):
     config_place = "".join([ca_path,"/",SSL_CONF])
 
     REQ="req -config %s"%(config_place)
-    CA="ca -config %s"%(config_place)
+    CA="ca -config %s -extensions v3_ca"%(config_place)
     
     #firstly create a request
     request_string = "".join([REQ," -new -keyout ",ca_path,"/private/",ca_key_name," -out ",ca_path,"/",request_file])            
