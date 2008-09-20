@@ -1,38 +1,40 @@
 #custom imports
-from cUtil import Cutil
 from imzaci.cert.cert import X509Cert
 #3rd party
 from M2Crypto import X509 
 
 class X509ChainManager(object):
     """ Loads, creates and controls the chains"""
-    
+    #some constants
+    FILE_PLACE = 0
+    M2CRYPTO_CERT=1
+    X509_CERT = 2
+
     def __init__(self):
-        self.__final_chain=[] #Will store the final CA stack
-        self.__ca_cert_stack=[] #The latest chain with CA's in it #the root is the latest one
-        self.__subject_cert = None #that will be the latest one in the chain which is
-        #not a CA
-    
-        #sometimes we may need to know if the loaded certs are
-        #controlled before ...
-        self.__chain_valid = False
+        #initialze all the stuff
+        self.__clear_structures() 
 
     def load_chain(self,chain_place,tip=0):
         """ Gets the certs from a list of files or from a list of buffers
-        if tip=0 it is from file list,if tip=1 it is a cert Object list
+        if tip=0 it is from file list,if tip=1 it is a cert Object(M2crypto TYPE),if tip==2 then
+        it is a X509Cert object (also very useful in our case for direct loading) list
         When loading we make a few controls which should be mentioned here:
         1)Check if the certs are valid(if they didnt expired ..)
-        2)If some of them are CA have tights to sign put them to __ca_cert_stack
+        2)If some of them are CA have rights to sign put them to __ca_cert_stack
         3)If they dont have CA they are put ito the self.__subject_cert (it should be 1)
         4) If some of that conditions is broken then exit with False !
         """
-        
-        for file in chain_place:
+        if self.__should_initialize():
+            self.__clear_structures()
+
+        for chain_candidate in chain_place:
             try:
-                if tip==0:
-                    cert_obj=X509Cert(X509.load_cert(file))
-                elif tip==1:
-                    cert_obj=X509Cert(file)
+                if tip==self.FILE_PLACE:
+                    cert_obj=X509Cert(X509.load_cert(chain_candidate))
+                elif tip==self.M2CRYPTO_CERT:
+                    cert_obj=X509Cert(chain_candidate)
+                elif tip==self.X509_CERT:
+                    cert_obj=chain_candidate
                     
             except Exception,e:
                 print "Some error occured when trying to load the cert chain ",e
@@ -43,7 +45,7 @@ class X509ChainManager(object):
                 print "The cert in the chain with that subject: %s is expired "%(cert_obj.person_info())
                 return False
 
-            if cert_obj.cert.is_ca():
+            if cert_obj.is_ca():
                 self.__ca_cert_stack.append(cert_obj)
             else:
                 self.__subject_cert.append(cert_obj)
@@ -67,6 +69,13 @@ class X509ChainManager(object):
         to construct the cert
         Simple is good :)
         """
+        #print "The current CA list is like :"
+        #for ca in self.__ca_cert_stack:
+        #    ca.list_info()
+        #print "The subject list is like :"
+        #for subj in self.__subject_cert:
+        #    subj.list_info()
+
         if self.__final_chain:
             self.__final_chain = []
 
@@ -119,7 +128,11 @@ class X509ChainManager(object):
             found = False
             for cert_check in self.__ca_cert_stack:
                 #check if subject info equeals to issuer info
-                if cert_check.person_info("subject") == find_issuer:
+                if str(cert_check.person_info("subject")).strip() == str(find_issuer).strip():
+                    #print "What we try is :"
+                    #print "The issuer to find :",find_issuer
+                    #print "The subject we check :",cert_check.person_info("subject")
+
                     #check if that CA has signed our current cert
                     if current_cert.verify_issuer(cert_check.get_public_key()):
                         self.__final_chain.append(cert_check)
@@ -132,10 +145,10 @@ class X509ChainManager(object):
                         return False
             
             if found == False and len(self.__ca_cert_stack) != len(self.__final_chain):
-                print "There is signer for cert with subject %s "%(current_cert.person_info("subject"))
+                print "There is no signer for cert with subject %s "%(current_cert.person_info("subject"))
                 return False
                 
-            elif found == False and len(self.__ca_cert_stack) == len(self.__final_chain):
+            elif len(self.__ca_cert_stack) == len(self.__final_chain):
                 #The chain is ok should exit from main while loop
                 current_cert = None
                 return True
@@ -186,6 +199,18 @@ class X509ChainManager(object):
             print "It seems that chain is not constructed try running create_chain method first"
             return None
 
+    def get_final_subject(self):
+        """
+        After you construct the chain get the subject
+        """
+        if self.__chain_valid:
+            return self.__subject_cert[0]
+        else:
+            print "It seems that chain is not constructed try running create_chain method first"
+            return None
+
+
+
     def is_chain_valid(self):
         return self.__chain_valid
 
@@ -208,15 +233,31 @@ class X509ChainManager(object):
 
         return 0
 
+    def __clear_structures(self):
+        """
+        Cleares the data structures for maybe reusing the object for different
+        objects and places ...
+        """
+        self.__final_chain=[] #Will store the final CA stack
+        self.__ca_cert_stack=[] #The latest chain with CA's in it #the root is the latest one
+        self.__subject_cert = [] #that will be the latest one in the chain which is
+        #not a CA
+    
+        #sometimes we may need to know if the loaded certs are
+        #controlled before ...
+        self.__chain_valid = False
+
+    def __should_initialize(self):
+        """
+        It tells if we need to initialize the structures useful 
+        for reusing the X509ChainManager objects ...
+        """
+        if self.__final_chain or self.__ca_cert_stack or self.__subject_cert or self.__chain_valid:
+            return True
+        else:
+            return False
+
         
- 
-            
 if __name__=="__main__":
-    c=chainMan()
-    c.load_chain(["/home/makkalot/my-svns/old_imza/imzaci/chain/cert1.pem","/home/makkalot/my-svns/old_imza/imzaci/chain/cert2.pem"])
-    print c.create_chain()
-    #print c.get_hash_list()
-    #Test with the stack
-    #print c.dumpto_stack().pop()
-    #st=stackWork(c.dumpto_stack())
-    #st.print_all()
+    pass
+
