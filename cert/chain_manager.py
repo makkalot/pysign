@@ -24,6 +24,9 @@ class X509ChainManager(object):
         3)If they dont have CA they are put ito the self.__subject_cert (it should be 1)
         4) If some of that conditions is broken then exit with False !
         """
+        if not chain_place:
+            return False
+
         if self.__should_initialize():
             self.__clear_structures()
 
@@ -42,7 +45,7 @@ class X509ChainManager(object):
             
             #chect its dates
             if not cert_obj.is_valid():
-                print "The cert in the chain with that subject: %s is expired "%(cert_obj.person_info())
+                raise ChainValidationException("The cert in the chain with that subject: %s is expired "%(cert_obj.person_info()))
                 return False
 
             if cert_obj.is_ca():
@@ -80,15 +83,15 @@ class X509ChainManager(object):
             self.__final_chain = []
 
         if len(self.__ca_cert_stack) == 0:
-            print "There is no CA certs into the chain you try to build."
+            raise ChainValidationException("There is no CA certs into the chain you try to build.")
             return False
 
         if len(self.__subject_cert) > 1:
-            print "There should be only one non CA cert into the chain"
+            raise ChainValidationException("There should be only one non CA cert into the chain")
             return False
 
-        if len(self.__ca_cert_stack) == 1 and len(self.__subject_cert):
-            print "Only one cert was found we can construct the chain with one cert"
+        if len(self.__ca_cert_stack) == 1 and len(self.__subject_cert)==0:
+            raise ChainValidationException("Only one cert was found we can not  construct the chain with one cert")
             return False
 
         if len(self.__subject_cert)>0:
@@ -103,10 +106,10 @@ class X509ChainManager(object):
         else:#if all of our certs are CA which is notvery wise but ...
             cert_index = self.__find_starting_index()
             if cert_index == -1:
-                print "Chain can not be constructed no starting point found"
+                raise ChainValidationException("Chain can not be constructed no starting point found")
                 return False
             current_cert = self.__ca_cert_stack[cert_index]
-            self.__construct_chain(current_cert)
+            result=self.__construct_chain(current_cert)
             
             if not result :
                 return False
@@ -123,15 +126,21 @@ class X509ChainManager(object):
         3) If all goes good we will have a fresh good chain :)
         """
         find_issuer = current_cert.person_info("issuer")
+        #sometimes the passed cert is also a CA so
+        #that breakes the normal behaviour if it is
+        #a CA we should add it immediately to the list...
+        if current_cert.is_ca():
+            self.__final_chain.append(current_cert)
+
         while not current_cert is None:
             #did we found a match ?
             found = False
             for cert_check in self.__ca_cert_stack:
                 #check if subject info equeals to issuer info
-                if str(cert_check.person_info("subject")).strip() == str(find_issuer).strip():
-                    #print "What we try is :"
-                    #print "The issuer to find :",find_issuer
-                    #print "The subject we check :",cert_check.person_info("subject")
+                #print "What we try is :"
+                #print "The issuer to find :",find_issuer
+                #print "The subject we check :",cert_check.person_info("subject")
+                if cert_check.person_info("subject") == find_issuer:
 
                     #check if that CA has signed our current cert
                     if current_cert.verify_issuer(cert_check.get_public_key()):
@@ -141,11 +150,11 @@ class X509ChainManager(object):
                         found = True
                         break
                     else:
-                        print "The cert with subject %s didnt sign the cert with subject %s the chain can not be constructed"%(cert_check.person_info("subject"),find_issuer)
+                        raise ChainValidationException("The cert with subject %s didnt sign the cert with subject %s the chain can not be constructed"%(cert_check.person_info("subject"),find_issuer))
                         return False
             
             if found == False and len(self.__ca_cert_stack) != len(self.__final_chain):
-                print "There is no signer for cert with subject %s "%(current_cert.person_info("subject"))
+                raise ChainValidationException("There is no signer for cert with subject %s "%(current_cert.person_info("subject")))
                 return False
                 
             elif len(self.__ca_cert_stack) == len(self.__final_chain):
@@ -168,7 +177,9 @@ class X509ChainManager(object):
             subj = subject_pick_cert.person_info("subject")
             found = False
             for sub_search_cert in self.__ca_cert_stack:
+
                 if sub_search_cert.person_info("issuer") == subj:
+                    #print "Index is ",index
                     found = True
                     break
             #yep that is our starting point
@@ -180,7 +191,7 @@ class X509ChainManager(object):
     def dumpto_stack(self):
         """ That one dumps all the stuff created with create_chain method"""
         if not self.__chain_valid:
-            print "It seems that chain is not constructed try running create_chain method first"
+            raise ChainValidationException("It seems that chain is not constructed try running create_chain method first")
             return None
         
         newStack=X509.X509_Stack()
@@ -196,7 +207,7 @@ class X509ChainManager(object):
 
             return self.__final_chain
         else:
-            print "It seems that chain is not constructed try running create_chain method first"
+            raise ChainValidationException("It seems that chain is not constructed try running create_chain method first")
             return None
 
     def get_final_subject(self):
@@ -206,7 +217,7 @@ class X509ChainManager(object):
         if self.__chain_valid:
             return self.__subject_cert[0]
         else:
-            print "It seems that chain is not constructed try running create_chain method first"
+            raise ChainValidationException("It seems that chain is not constructed try running create_chain method first")
             return None
 
 
@@ -257,7 +268,19 @@ class X509ChainManager(object):
         else:
             return False
 
-        
+
+class ChainValidationException(Exception):
+    """
+    Raised when we have some chain validation/creation error
+    """
+    
+    def __init__(self, value=None):
+        Exception.__init__(self)
+        self.value = value
+    def __str__(self):
+        return "%s" %(self.value,)
+
+
 if __name__=="__main__":
     pass
 
