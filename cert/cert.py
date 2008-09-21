@@ -158,7 +158,7 @@ class X509Cert(object):
         else:
             return None
     
-        return xn #XName Object
+        return str(xn).strip() #XName Object
     
     
     def get_detail(self,tip="issuer"):
