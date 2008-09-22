@@ -269,6 +269,33 @@ class X509ChainManager(object):
             return False
 
 
+
+def chain_manager_factory(chain_place,load_type):
+    """
+    A common factory function that returns back a
+    X509ChainManager object
+    """
+    if not chain_place:
+        print "No chain to load sorry "
+        return None
+
+    try:
+        cm = X509ChainManager() #create an instance
+        load_result = cm.load_chain(chain_place,load_type)
+        if not load_result:
+            print "Some error when loading the chain"
+            return None
+
+        create_result = cm.create_chain()
+        if not create_result:
+            print "The chain can not be constructed sorry "
+            return None
+        return cm
+    except ChainValidationException,c:
+        print e
+        return None
+
+
 class ChainValidationException(Exception):
     """
     Raised when we have some chain validation/creation error
