@@ -292,7 +292,7 @@ def chain_manager_factory(chain_place,load_type):
             return None
         return cm
     except ChainValidationException,c:
-        print e
+        print c
         return None
 
 
