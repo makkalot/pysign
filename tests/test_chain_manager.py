@@ -67,15 +67,10 @@ class TestX509ChainManager(object):
         if not do_chain_pack_exist(self.constant_list_of_dirs):
             raise Exception("You dont have the test dirs run ssl_util to create them")
 
-    def setUp(self):
-        """
-        Hohoh
-        """
-        pass
-
     def test_load_chain(self):
         """
         The loader place
+        #I think it is same with test_create_chain 
         """
         pass
 
