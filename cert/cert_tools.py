@@ -1,5 +1,5 @@
 import glob
-
+#custom loads
 from imzaci.cert.cert import X509Cert
 from imzaci.util.ssl_util import open_internal_db
 
@@ -23,6 +23,28 @@ def load_chain_file(chain_file):
     """
     pass
 
+def chain_manager_factory(chain_place,load_type):
+    """
+    A common factory function that returns back a
+    X509ChainManager object
+    """
+    if not chain_place:
+        print "No chain to load sorry "
+        return None
+
+    from imzaci.cert.chain_manager import X509ChainManager
+    cm = X509ChainManager() #create an instance
+    load_result = cm.load_chain(chain_place,load_type)
+    if not load_result:
+        print "Some error when loading the chain"
+        return None
+
+    create_result = cm.create_chain()
+    if not create_result:
+        print "The chain can not be constructed sorry "
+        return None
+    
+    return cm
 
 def load_chain_from_dirs(list_of_dirs):
     """
@@ -33,28 +55,8 @@ def load_chain_from_dirs(list_of_dirs):
     recursive things because we may have some private keys :)
     """
     chain_place = load_certs_from_dirs(list_of_dirs)
-    if not chain_place:
-        print "No chain to load sorry "
-        return None
-
-    from imzaci.cert.chain_manager import X509ChainManager
-    cm = X509ChainManager() #create an instance
-    load_result = cm.load_chain(chain_place,cm.X509_CERT)
-    if not load_result:
-        print "Some error when loading the chain"
-        return None
-
-    create_result = cm.create_chain()
-    if not create_result:
-        print "The chain can not be constructed sorry "
-        return None
-    
-    #returns back the final valid chain ...
-    #test the final
-    #c=cm.get_final_subject()
-    #c.list_info()
-
-    return cm
+    result=chain_manager_factory(chain_place,X509ChainManager.X509_CERT)
+    return result
 
 
 def load_certs_from_dir(scan_dir):
@@ -133,6 +135,7 @@ def load_certs_from_dir_rec(root_dir):
     """
     Gets a list of certs from root dir
     by scanning recursively ...
+    Not sure if needed ?
     """
     pass
 
@@ -153,7 +156,6 @@ def store_chain_dir(chain_obj,chain_dir=None):
 
 
 
-#if __name__ == "__main__":
-#    print load_cert_from_dir("/home/makkalot/mygits/pysign/imzaci/chain/child")
-#    #print load_certs_from_dir("/home/makkalot/mygits/pysign/imzaci/chain/child")
+if __name__ == "__main__":
+    pass
     
