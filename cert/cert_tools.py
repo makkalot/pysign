@@ -2,7 +2,7 @@ import glob
 #custom loads
 from imzaci.cert.cert import X509Cert
 from imzaci.util.ssl_util import open_internal_db
-from imzaci.cert.chain_manager import chain_manager_factory
+from imzaci.cert.chain_manager import chain_manager_factory,X509ChainManager
 """
 A module that supplies some cert util methods for getting and setting em
 """
@@ -12,7 +12,9 @@ def load_chain_dir(chain_dir):
     Loads a chain of certs from a dir
     Only gets the .pem files from it
     """
-    pass
+    chain_place=load_cert_from_dir(chain_dir,get_all=True)
+    result=chain_manager_factory(chain_place,X509ChainManager.X509_CERT)
+    return result
 
 def load_chain_file(chain_file):
     """
