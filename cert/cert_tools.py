@@ -23,7 +23,21 @@ def load_chain_file(chain_file):
     ----BEGIN CERT----
     ----END CERT-----
     """
-    pass
+    from imzaci.util.cert_util import parse_pem_cert
+    import os
+
+    if not os.path.exists(chain_file):
+        print "Chain file doesnt exists"
+        return None
+
+    chain_place = parse_pem_cert(chain_file)
+    if not chain_place:
+        print "Error when loading the chain file ",chain_file
+        return None
+
+    result=chain_manager_factory(chain_place,X509ChainManager.X509_CERT)
+    return result
+
     
 
 def load_chain_from_dirs(list_of_dirs):
@@ -121,13 +135,13 @@ def load_certs_from_dir_rec(root_dir):
 
 ############### STORING METHODS #############################
 
-def store_chain_file(chain_obj,file=None):
+def store_chain_file(chain_obj,file=None,include_signer=False):
     """
     Stores a chain object into a single .pem file
     """
     pass
 
-def store_chain_dir(chain_obj,chain_dir=None):
+def store_chain_dir(chain_obj,chain_dir=None,include_signer=False):
     """
     Store a chain object into a dir in seperated
     .pem objects ...
