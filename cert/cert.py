@@ -28,6 +28,12 @@ class X509Cert(object):
         self.cert=x.load_cert_string(certData)
         return True
          #to check if it was loaded
+
+    def store_to_file(self,filename):
+        """
+        A simple wrapper
+        """
+        self.cert.save_pem(filename)
         
     def set_cert(self,certObj):
         """ Sets the global cert object from outside the class"""
@@ -139,7 +145,7 @@ class X509Cert(object):
             return False
         
         
-    def person_info(self,tip="subject"):
+    def person_info(self,tip="subject",as_str=True):
         """ Gets the sides info ex signer(issuer),subject etc."""
         xn=None
         
@@ -150,13 +156,15 @@ class X509Cert(object):
             xn=self.cert.get_issuer()
         else:
             return None
-    
-        return str(xn).strip() #XName Object
-    
+        
+        if as_str:
+            return str(xn).strip() #XName Object as string
+        else:
+            return xn #as object
     
     def get_detail(self,tip="issuer"):
         """ Returns a tuple to be displayed"""
-        xn=self.person_info(tip)
+        xn=self.person_info(tip,as_str=False)
         
         clear_dic={
                    'C':'country',
@@ -168,10 +176,6 @@ class X509Cert(object):
                    }
         
         toPrint={}
-        
-        #print type(xn)
-        #Take the country firstly
-        
         for k in clear_dic.keys():
             entry=xn.get_entries_by_nid(xn.nid[k])
             toPrint[clear_dic[k]]=str(entry[0].get_data())
