@@ -1,5 +1,6 @@
 import os
 from imzaci.config import INTERNAL_DB_FILE
+from imzaci.util.ssl_util import open_internal_db
 
 #here you put the certs you trust
 TRUSTED_DB_PATH = "/home/makkalot/mygits/pysign/imzaci/chain/trusted"
@@ -49,14 +50,38 @@ class DbCertHandler(object):
         return True
         
 
-    def add_cert(self,cert_obj):
+    def add_cert(self,cert_obj,cert_file=None):
         """
         Adds a single cert into the database it is
         important to make the checks and see if you have it
         already there ...
         """
-        pass
+        if not self.__cert_store:
+            if not self.load_db():
+                self.recreate_internal_db()
 
+        cert_subj = cert_obj.person_info()
+        cert_hash = cert_obj.cert_hash()
+        
+        for db_cert_hash,cert_dict in self.__cert_store.iteritems():
+            if db_cert_hash == cert_hash and cert_subj==cert_dict['cert_subject']: #it seems we have that entry
+                #do we have that cert file
+                print "We have the cert in database already"
+                return False
+
+        if cert_file:
+            cert_file = self.__generate_filename(cert_file)
+
+        else:
+            #a default entry
+            cert_file = self.__generate_filename("cert")
+            
+        cert_entry = self.__create_entry_index(cert_obj,os.path.split(cert_file)[1],is_chain=False)
+        open_internal_db(self.__db_dir,"w",write_dict=cert_entry)
+        cert_obj.store_to_file(cert_file)
+        return True
+
+    
     def add_cert_chain(self,cert_chain_obj):
         """
         Adds a chain into the db
@@ -69,7 +94,20 @@ class DbCertHandler(object):
         """
         Passes the cert to the add_cert method actually !
         """
-        pass
+        from M2Crypto import X509 as x
+        from imzaci.cert.cert import X509Cert
+
+        if not os.path.exists(path):
+            print "No cert to add into database"
+            return False
+
+        cert=x.load_cert(path)
+        cert_obj=X509Cert(cert)
+        filename = os.path.split(path)[1]
+        if self.add_cert(cert_obj,filename):
+            return True
+        else:
+            return False
 
     def add_chain_from_file(self,path):
         """
@@ -137,7 +175,6 @@ class DbCertHandler(object):
         import glob
         from imzaci.util.cert_util import parse_pem_cert 
         from imzaci.cert.chain_manager import chain_manager_factory,X509ChainManager
-        from imzaci.util.ssl_util import open_internal_db
 
         internal_file_path = os.path.join(self.__db_dir,INTERNAL_DB_FILE)
         if os.path.exists(internal_file_path):
@@ -159,11 +196,11 @@ class DbCertHandler(object):
                     continue
                 else:
                     for c in chain:
-                        cert_entry = self.__create_entry_index(c,internal_file_path,cert_file,is_chain=True)
+                        cert_entry = self.__create_entry_index(c,cert_file,is_chain=True)
                         open_internal_db(self.__db_dir,"w",write_dict=cert_entry)
             else:
                 #it is a single one
-                cert_entry = self.__create_entry_index(parsed_object[0],internal_file_path,cert_file,is_chain=False)
+                cert_entry = self.__create_entry_index(parsed_object[0],cert_file,is_chain=False)
                 open_internal_db(self.__db_dir,"w",write_dict=cert_entry)
 
         return True
@@ -180,7 +217,7 @@ class DbCertHandler(object):
         """
         pass
 
-    def __create_entry_index(self,cert_obj,db_file_path,cert_file,is_chain=False):
+    def __create_entry_index(self,cert_obj,cert_file,is_chain=False):
         """
         Add cert properties into the internal db
         """
@@ -198,6 +235,22 @@ class DbCertHandler(object):
                     'is_chain':is_chain
                     }
                 }
+
+    def __generate_filename(self,possible_name):
+        """
+        An util method for generatign cert names
+        """
+        import string
+        nth_item = 1
+        while os.path.exists(os.path.join(self.__db_dir,possible_name)):
+            
+            if string.find(possible_name,".pem") != -1:
+                possible_name = possible_name.split(".pem")[0]
+            
+            possible_name = "".join([possible_name,"_",str(nth_item),".pem"])
+            nth_item +=1
+
+        return os.path.join(self.__db_dir,possible_name)
 
 if __name__ == "__main__":
     pass
