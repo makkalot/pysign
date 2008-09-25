@@ -244,6 +244,12 @@ class X509ChainManager(object):
 
         return 0
 
+    def __iter__(self):
+        """
+        Simple iterator over final CA chain
+        """
+        return iter(self.__final_chain)
+
     def __clear_structures(self):
         """
         Cleares the data structures for maybe reusing the object for different
