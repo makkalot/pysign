@@ -25,15 +25,7 @@ class X509Cert(object):
     def set_from_buf(self,certData,format=0):
         """ The method sets the cert with data from a buffer
         format 0 is for pem and 1 for der"""
-        
-        #buf=MemoryBuffer()
-        #buf.write(certData)
-        
-        #Loads  into global object
-        #print certData
         self.cert=x.load_cert_string(certData)
-        #print self.cert.get_not_before()
-        
         return True
          #to check if it was loaded
         
@@ -45,7 +37,8 @@ class X509Cert(object):
         """
         It is all of the certs hash
         """
-        return str(self.cert.get_fingerprint("sha1"))
+        import string
+        return string.lower(str(self.cert.get_fingerprint("sha1")))
 
     def list_info(self,tam=None):
         """ Lists some info about the cert"""
