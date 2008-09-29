@@ -243,6 +243,13 @@ class X509ChainManager(object):
                 return -1
 
         return 0
+    
+    def __str__(self):
+        result = ""
+        for cert in self.__final_chain:
+            result = "".join([result,"\n*************\n",str(cert)])
+        return result
+
 
     def __iter__(self):
         """
