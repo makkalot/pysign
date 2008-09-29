@@ -134,15 +134,32 @@ class DbCertHandler(object):
         """
         pass
 
-    def list_cert_detail(self,cert_criteria):
+    def list_cert_detail(self,search_criteria,summary=False):
         """
         Lists the certs detailed info for given criteria
         The criteria can be hash,subject_name or
-        issuer_name 
-        NOTE : can return more than one ! only hash gives
-        back one cert detail ...
+        issuer_name
+        summary is for printing the raw cert or a summary
         """
-        pass
+        if summary:
+            search_result = self.search_cert(search_criteria)
+            if not search_result:
+                return []
+            print "|Cert hash| \t |Cert Detail|"
+            for cert_hash,cert_detail in search_result.iteritems():
+                print "***************************"
+                print cert_hash
+                print cert_detail
+                print "***************************"
+            
+        else:
+            search_result = self.search_and_get_cert(search_criteria)
+            if not search_result:
+                return []
+            for s in search_result:
+                print "***************************"
+                print s
+                print "***************************"
 
     def remove_cert(self,cert_criteria):
         """
