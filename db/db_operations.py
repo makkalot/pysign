@@ -48,7 +48,8 @@ class DbCertHandler(object):
         else:
             self.__cert_store = result
         return True
-        
+
+    
 
     def add_cert(self,cert_obj,cert_file=None):
         """
@@ -56,10 +57,9 @@ class DbCertHandler(object):
         important to make the checks and see if you have it
         already there ...
         """
-        if not self.__cert_store:
-            if not self.load_db():
-                self.recreate_internal_db()
-
+        #some sanity checks ...
+        self.__initialize_db_ifnot()
+        
         cert_subj = cert_obj.person_info()
         cert_hash = cert_obj.cert_hash()
         
@@ -119,11 +119,13 @@ class DbCertHandler(object):
         """
         Lists all the certs in that db (direcory actually)
         """
-        if not self.__cert_store:
-            self.load_db()
-        
+        self.__initialize_db_ifnot() 
         #Now just print the stuff natively
-        print self.__cert_store
+        #print self.__cert_store
+        print "|Cert hash| \t |Cert Detail|"
+        for cert_hash,cert_detail in self.__cert_store.iteritems():
+            print cert_hash
+            print cert_detail
 
     def list_chain_certs(self,by_hash=None,by_sub_name=None):
         """
@@ -251,6 +253,131 @@ class DbCertHandler(object):
             nth_item +=1
 
         return os.path.join(self.__db_dir,possible_name)
+
+    def search_cert(self,search_criteria):
+        """
+        It searches for certs and gets the results in a list
+        The search_criteria can be one of the fingerprint,any field
+        of the subject field in the X.509 cert
+        """
+        self.__initialize_db_ifnot()
+        search_result = {}
+        for cert_hash,cert_detail in self.__cert_store.iteritems():
+            #check if cert hash matches the serach query ...
+            if (cert_hash == search_criteria) or (search_criteria in extract_subject_info(cert_detail["cert_subject"])):
+                search_result[cert_hash]=cert_detail
+        
+        return search_result
+
+
+    def search_and_get_cert(self,search_criteria):
+        """
+        That one returns back the instances to be compared
+        """
+        certs=[]
+        search_result = self.search_cert(search_criteria)
+        if not search_result:
+            return None
+        
+        from M2Crypto import X509 as x
+        from imzaci.cert.cert import X509Cert
+        from imzaci.cert.cert_tools import load_chain_file
+       
+        for cert_hash,cert_detail in search_result.iteritems():
+            if not os.path.exists(cert_detail['cert_file']):
+                print "The db is probably corrupted ,try running recreate_internal_db"
+                return None
+            if not cert_detail["is_chain"]:
+                #if it is not a chain file you just go and get
+                #the whole file so no problem here
+                cert=x.load_cert(cert_detail["cert_file"])
+                certs.append(X509Cert(cert))
+            else:
+                #the cert you are looking for is a member of a chain
+                #so get it,load the chain and then look for hash match
+                chain=load_chain_file(cert_detail['cert_file'])
+                if not chain:
+                    continue
+                #is it what we look for ?
+                for c in chain:
+                    if c.cert_hash() == cert_hash:
+                        certs.append(c)
+                    else:
+                        continue
+        #get those certs
+        return certs
+
+
+    def search_chain(self,search_criteria):
+        """
+        Searches for a chain into the database
+        what we will have here as a result is a
+        list of files that includes these chains
+        """
+        chain_files = set()
+        certs=self.search_cert(search_criteria)
+        if not certs:
+            return None
+        for cert_hash,cert_detail in certs.iteritems():
+            #if it is a reak chain 
+            if cert_detail['is_chain']:
+                chain_files.add(cert_detail['cert_file'])
+        #get the list of chain files ...
+        return chain_files
+    
+    def search_and_get_chain(self,search_criteria):
+        """
+        Searches and gets the chain from the db the search_criteria
+        is the same as aboves
+        """
+        from imzaci.cert.cert_tools import load_chain_file
+        
+        chain_list = []
+        chain_files = self.search_chain(search_criteria)
+        if not chain_files:
+            return chain_list
+
+        #we have now the chain list files so can get em
+        for chain_file in chain_files:
+            tmp_chain=load_chain_file(chain_file)
+            if not tmp_chain:
+                continue
+            else:
+                chain_list.append(tmp_chain)
+        
+        return chain_list
+
+
+
+    def __initialize_db_ifnot(self):
+        """
+        An util method for controlling the 
+        db initial values ...
+        """
+        if not self.__cert_store:
+            if not self.load_db():
+                self.recreate_internal_db()
+
+def extract_subject_info(subject_str):
+    """
+    A simple util method for extracting some info
+    from the subject cert string
+    """
+    result_str = []
+    subject_str = subject_str.split("/")
+    if not subject_str:
+        return []
+
+    for subject_entry in subject_str:
+        if subject_entry:
+            sub_value = subject_entry.split("=")
+            if sub_value and len(sub_value) == 2:
+                result_str.append(sub_value[1].strip())
+            else:
+                continue
+
+    return result_str
+
 
 if __name__ == "__main__":
     pass
