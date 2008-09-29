@@ -68,7 +68,12 @@ class X509Cert(object):
         
         #print self.cert.as_pem()
         #print self.cert.as_der()
-        
+    def __str__(self):
+        """
+        The general cert info
+        """
+        return self.cert.as_text()
+
     def store_tofile(self,fname):
         """ Loads the certficate to a file"""
         self.cert.save(fname)
