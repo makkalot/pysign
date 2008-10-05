@@ -3,10 +3,10 @@ from imzaci.config import INTERNAL_DB_FILE
 from imzaci.util.ssl_util import open_internal_db
 
 #here you put the certs you trust
-TRUSTED_DB_PATH = "/home/makkalot/mygits/pysign/imzaci/chain/trusted"
+TRUSTED_DB_PATH = "/home/makkalot/code_repo/my_git/pysign/imzaci/chain/trusted"
 TRUSTED_DB = "trusted"
 #here you put the banned certs and theirs CA's
-UNTRUSTED_DB_PATH = "/home/makkalot/mygits/pysign/imzaci/chain/untrusted"
+UNTRUSTED_DB_PATH = "/home/makkalot/code_repo/my_git/pysign/imzaci/chain/untrusted"
 UNTRUSTED_DB = "untrusted"
 #here you put your stuff !
 MY_STORE= "mystore"
@@ -63,15 +63,17 @@ class DbCertHandler(object):
         cert_subj = cert_obj.person_info()
         cert_hash = cert_obj.cert_hash()
         
-        for db_cert_hash,cert_dict in self.__cert_store.iteritems():
-            if db_cert_hash == cert_hash and cert_subj==cert_dict['cert_subject']: #it seems we have that entry
-                #do we have that cert file
-                print "We have the cert in database already"
-                return False
+        #firstly make a search for that cert in db wanto go deepr ?
+        cert_result = self.search_and_get_cert(cert_hash)
+        if cert_result:
+            for cert in cert_result:
+                #we can compare two cert you know :)
+                if cert == cert_obj:
+                    print "The cert you are trying to add already exists into db"
+                    return False
 
         if cert_file:
             cert_file = self.__generate_filename(cert_file)
-
         else:
             #a default entry
             cert_file = self.__generate_filename("cert")
@@ -82,13 +84,37 @@ class DbCertHandler(object):
         return True
 
     
-    def add_cert_chain(self,cert_chain_obj):
+    def add_cert_chain(self,cert_chain_obj,chain_file = None):
         """
         Adds a chain into the db
         first check if it is a valid chain
         and also check if you have the exact chain into the db
         """
-        pass
+        
+        #firstly make a search 
+        compare_chains = self.search_and_get_chain("*") #get all chains
+        if compare_chains: #look insite em and search for a match
+            for chain in compare_chains:
+                if chain == cert_chain_obj:
+                    print "The chain you try to insert into db already exists"
+                    return False
+                
+        if chain_file:
+            chain_file = self.__generate_filename(chain_file)
+        else:
+            #a default entry
+            chain_file = self.__generate_filename("chain")
+        
+        #add one by one to the index file
+        for cert_store in cert_chain_obj:
+            cert_entry = self.__create_entry_index(cert_store,os.path.split(chain_file)[1],is_chain=True)
+            open_internal_db(self.__db_dir,"w",write_dict=cert_entry)
+        
+        #store the file into a chain file
+        cert_chain_obj.store_to_file(chain_file)
+        return True
+
+
 
     def add_cert_from_file(self,path):
         """
@@ -112,8 +138,16 @@ class DbCertHandler(object):
     def add_chain_from_file(self,path):
         """
         Passes the chain to the add_cert_chain method
+        a very useful method ...
         """
-        pass
+        from imzaci.cert.cert_tools import load_chain_file
+        chain_obj=load_chain_file(path)
+        if not chain_obj:
+            return False
+        
+        if not self.add_cert_chain(chain_obj,os.path.split(path)[1]):
+            return False
+        return True
 
     def list_db_all(self):
         """
@@ -167,11 +201,22 @@ class DbCertHandler(object):
         """
         pass
 
-    def remove_chain(self,cert_criteria):
+    def remove_chain(self,chain_files):
         """
-        Removes a whole chain of certs
+        Removes a whole chain of certs it gets
+        the list of files and removes em
         """
-        pass
+        self.__initialize_db_ifnot()
+        if not chain_files:
+            return False
+
+        for chain_file in chain_files:
+            os.remove(chain_file)
+            #load the db again
+            self.load_db()
+            
+
+
 
     def clear_db(self):
         """
@@ -201,8 +246,8 @@ class DbCertHandler(object):
 
         possible_certs = glob.glob("".join([self.__db_dir,"/","*.pem"]))
         if not possible_certs:
-            print "There s no cert file into the dir you try to create internal db ",self.__db_dir
-            return False
+            open_internal_db(self.__db_dir,"w",write_dict={})
+            return True
 
         for cert_file in possible_certs:
             parsed_object = parse_pem_cert(cert_file)
@@ -276,8 +321,12 @@ class DbCertHandler(object):
         It searches for certs and gets the results in a list
         The search_criteria can be one of the fingerprint,any field
         of the subject field in the X.509 cert
+        Note: there is a shortcut "*" for getting all the certs
         """
         self.__initialize_db_ifnot()
+        if search_criteria == "*":
+            return self.__cert_store
+
         search_result = {}
         for cert_hash,cert_detail in self.__cert_store.iteritems():
             #check if cert hash matches the serach query ...
