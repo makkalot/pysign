@@ -1,0 +1,115 @@
+from imzaci.config import MY_STORE,INTERNAL_DB_FILE
+import shelve
+import dbm
+import fcntl
+
+
+class IndexDb(object):
+    """
+    A simple wrapper for index Db,which
+    is a kind of pickle ...
+    """
+    WRITE_MODE = "w"
+    READ_MODE = "r"
+
+    def __init__(self,dir):
+        """
+        Load the db when have an instance
+        """
+        self.__storage = None
+        self.__handle = None
+        self.__dir = dir
+
+    def __load_index(self):
+        """
+        Gets the store object for that instance
+        """
+        import os
+        if not os.path.exists(self.__dir):
+            filename=os.path.join(MY_STORE,self.__dir,INTERNAL_DB_FILE)
+        else:
+            filename=os.path.join(self.__dir,INTERNAL_DB_FILE)
+        try:
+            self.__handle = open(filename,self.__mode)
+        except IOError, e:
+            print 'Cannot create status file. Ensure you have permission to write'
+            return False
+
+        fcntl.flock(self.__handle.fileno(), fcntl.LOCK_EX)
+        internal_db = dbm.open(filename, 'c', 0644 )
+        self.__storage = shelve.Shelf(internal_db)
+        return True
+
+    def write_to_index(self,write_dict):
+        """
+        Writes the dictonary into the index
+        """
+        self.__mode = self.WRITE_MODE
+        if not self.__storage:
+            self.__load_index()
+        try:
+            for key,value in write_dict.iteritems():
+                self.__storage[key]=value
+        except Exception,e:
+            print e
+            self.__storage = None
+            return False
+
+        self.__close_storage()
+        return True
+
+    def read_from_index(self):
+        """
+        Returns back a copy dict of the db
+        """
+        self.__mode = self.READ_MODE
+        if not self.__storage:
+            self.__load_index()
+
+        try:
+            tmp=dict(self.__storage)
+        except Exception,e:
+            print e
+            self.__storage = None
+            return None
+        
+        self.__close_storage()
+        return tmp
+        
+
+    def delete_from_index(self,delete_list):
+        """
+        Deletes a list of items from current store object
+        """
+        self.__mode = self.WRITE_MODE
+        if not self.__storage:
+            self.__load_index()
+            
+        try:
+            for to_delete in delete_list:
+                if self.__storage.has_key(to_delete):
+                    del self.__storage[to_delete]
+        except Exception,e:
+            print e
+            self.__storage = None
+            return False
+        
+        self.__close_storage()
+        return True
+
+    def __close_storage(self):
+        """
+        Close all the stuff
+        """
+        if not self.__storage:
+            return False
+
+        self.__storage.close()
+        fcntl.flock(self.__handle.fileno(), fcntl.LOCK_UN)
+        self.__storage = None
+        return True
+
+
+if __name__ == "__main__":
+    pass
+
