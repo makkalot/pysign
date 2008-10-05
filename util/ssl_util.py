@@ -246,38 +246,6 @@ def set_ssl_cnf(ca_dir_name,ca_cert,private_key):
 
     return True
 
-def open_internal_db(dir,mode,write_dict=None):
-    """
-    There are 2 modes one r and w
-    """
-    import os
-    if not os.path.exists(dir):
-        filename=os.path.join(MY_STORE,dir,INTERNAL_DB_FILE)
-    else:
-        filename=os.path.join(dir,INTERNAL_DB_FILE)
-
-    try:
-        handle = open(filename,mode)
-    except IOError, e:
-        print 'Cannot create status file. Ensure you have permission to write'
-        return None
-
-    fcntl.flock(handle.fileno(), fcntl.LOCK_EX)
-    internal_db = dbm.open(filename, 'c', 0644 )
-    storage = shelve.Shelf(internal_db)
-    
-    if mode == "w":
-        for key,value in write_dict.iteritems():
-            storage[key]=value
-    elif mode == "r":
-        tmp=dict(storage)
-        #print tmp
-    storage.close()
-    fcntl.flock(handle.fileno(), fcntl.LOCK_UN)
-    if mode == "r":
-        return tmp
-    else:
-        return True
 
 #That method is for creating the initial Testing Database so it should be run only once 
 def prepare_test_environment():
