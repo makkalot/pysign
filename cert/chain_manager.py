@@ -281,8 +281,26 @@ class X509ChainManager(object):
         else:
             return False
 
+    def store_to_file(self,chain_file):
+        """
+        Stores the CAs into a chain file, it is
+        the format we use in our file db so it is
+        needed ...
+        """
+        import os
+        if not self.__chain_valid or not self.__final_chain:
+            return False
+        try:
+            chain_file = open(chain_file,"w")
+            for cert in self.__final_chain:
+                chain_file.write(cert.get_cert_text())
+            chain_file.close()
+        
+        except IOException,e:
+            print e
+            return False
 
-
+        return True
 def chain_manager_factory(chain_place,load_type):
     """
     A common factory function that returns back a
