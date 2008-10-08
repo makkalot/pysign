@@ -3,10 +3,10 @@ from imzaci.cert.chain_manager import X509ChainManager,ChainValidationException
 from imzaci.cert.cert_tools import load_certs_from_dirs
 
 list_of_cert_dirs={
-        "0":"/home/makkalot/mygits/pysign/imzaci/chain/child",
-        "3":"/home/makkalot/mygits/pysign/imzaci/chain/my-ca",
-        "2":"/home/makkalot/mygits/pysign/imzaci/chain/inter1",
-        "1":"/home/makkalot/mygits/pysign/imzaci/chain/inter2"
+        "0":"/home/makkalot/code_repo/my_git/pysign/imzaci/chain/child",
+        "3":"/home/makkalot/code_repo/my_git/pysign/imzaci/chain/my-ca",
+        "2":"/home/makkalot/code_repo/my_git/pysign/imzaci/chain/inter1",
+        "1":"/home/makkalot/code_repo/my_git/pysign/imzaci/chain/inter2"
         }
 
 def util_is_chain_valid(list_of_cert_dirs):
