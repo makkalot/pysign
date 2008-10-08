@@ -1,12 +1,10 @@
 import os
-from imzaci.config import INTERNAL_DB_FILE
-from imzaci.util.ssl_util import open_internal_db
-
+from imzaci.config import INTERNAL_DB_FILE,TRUSTED_DB_PATH,UNTRUSTED_DB_PATH
+from imzaci.db.index_db import get_index_data,write_index_data,delete_index_data
+import glob
 #here you put the certs you trust
-TRUSTED_DB_PATH = "/home/makkalot/code_repo/my_git/pysign/imzaci/chain/trusted"
 TRUSTED_DB = "trusted"
 #here you put the banned certs and theirs CA's
-UNTRUSTED_DB_PATH = "/home/makkalot/code_repo/my_git/pysign/imzaci/chain/untrusted"
 UNTRUSTED_DB = "untrusted"
 #here you put your stuff !
 MY_STORE= "mystore"
@@ -38,15 +36,12 @@ class DbCertHandler(object):
         actually we load the index file with summary of 
         the certs
         """
-        from imzaci.util.ssl_util import open_internal_db
         if not self.__db_dir or not os.path.exists(os.path.join(self.__db_dir,INTERNAL_DB_FILE)):
-            print "The internal db file is corrupted or doesnt exists,you should run recreate_internal_db method"
+            #Make here a logger plzzz
+            #print "The internal db file is corrupted or doesnt exists,you should run recreate_internal_db method"
             return False
-        result = open_internal_db(self.__db_dir,"r",write_dict=None)
-        if not result:
-            return True
-        else:
-            self.__cert_store = result
+        result = get_index_data(self.__db_dir)
+        self.__cert_store = result
         return True
 
     
@@ -78,9 +73,11 @@ class DbCertHandler(object):
             #a default entry
             cert_file = self.__generate_filename("cert")
             
-        cert_entry = self.__create_entry_index(cert_obj,os.path.split(cert_file)[1],is_chain=False)
-        open_internal_db(self.__db_dir,"w",write_dict=cert_entry)
+        cert_entry = self.__create_entry_index(cert_obj,cert_file,is_chain=False)
+        write_index_data(self.__db_dir,cert_entry)
         cert_obj.store_to_file(cert_file)
+        #reload the stuff
+        self.load_db()
         return True
 
     
@@ -107,11 +104,12 @@ class DbCertHandler(object):
         
         #add one by one to the index file
         for cert_store in cert_chain_obj:
-            cert_entry = self.__create_entry_index(cert_store,os.path.split(chain_file)[1],is_chain=True)
-            open_internal_db(self.__db_dir,"w",write_dict=cert_entry)
-        
+            cert_entry = self.__create_entry_index(cert_store,chain_file,is_chain=True)
+            write_index_data(self.__db_dir,cert_entry) 
         #store the file into a chain file
         cert_chain_obj.store_to_file(chain_file)
+        #reload the stuff
+        self.load_db()
         return True
 
 
@@ -156,6 +154,10 @@ class DbCertHandler(object):
         self.__initialize_db_ifnot() 
         #Now just print the stuff natively
         #print self.__cert_store
+        if self.__cert_store is None:
+            print "No items in database ...!"
+            return
+
         print "|Cert hash| \t |Cert Detail|"
         for cert_hash,cert_detail in self.__cert_store.iteritems():
             print cert_hash
@@ -198,22 +200,62 @@ class DbCertHandler(object):
     def remove_cert(self,cert_criteria):
         """
         Removes all the certs that match the criteria
+        It is a litlle bit tricky because if the cert_criteria
+        matches some of the cert chain we have to remove all the 
+        chain so we should be careful about that,when using the method !
         """
-        pass
+        remove_list = self.search_cert(cert_criteria)
+        print "**********The remove list is :**********",remove_list
+        if not remove_list:
+            print "No cert matches to be removed"
+            return False
+        
+        removed_chain_files = set()
+        final_remove_index = []
+        try:
+            for rem_cert_hash,rem_cert_pack in remove_list.iteritems():
+                #if it is a chain and we didnt remove it already ...
+                if rem_cert_pack['is_chain'] and not rem_cert_pack['cert_file'] in removed_chain_files:
+                    #we should remove all the certs in that chain
+                    removed_chain_files.add(rem_cert_pack['cert_file'])
+                    os.remove(rem_cert_pack['cert_file'])
+                
+                else:
+                    #remove that cert only
+                    #print "Removing that file :",rem_cert_pack['cert_file']
+                    os.remove(rem_cert_pack['cert_file'])
+                    
+                final_remove_index.append(rem_cert_hash)
+            
+            #remove the final hashes from index db
+            delete_index_data(self.__db_dir,final_remove_index)
+            #reload the index again if you are going to reuse that object
+            self.load_db()
+        except Exception,e:
+            print e
+            return False
+        
+        return True
 
-    def remove_chain(self,chain_files):
+                
+    def remove_chain(self,chain_criteria):
         """
         Removes a whole chain of certs it gets
         the list of files and removes em
         """
-        self.__initialize_db_ifnot()
-        if not chain_files:
+        chain_remove_list = self.search_chain(chain_criteria)
+        if not chain_remove_list:
             return False
 
-        for chain_file in chain_files:
+        for chain_file in chain_remove_list:
             os.remove(chain_file)
             #load the db again
-            self.load_db()
+    
+        #reload all the stuff
+        self.recreate_internal_db()
+        #get it into the memory
+        self.load_db()
+        return True
             
 
 
@@ -222,7 +264,18 @@ class DbCertHandler(object):
         """
         A dangerous one be careful :)
         """
-        pass
+        
+        internal_file_path = os.path.join(self.__db_dir,INTERNAL_DB_FILE)
+        if os.path.exists(internal_file_path):
+            index_files = glob.glob("".join([internal_file_path,"*"]))
+            #print "The index files to remove : ",index_files
+            for index_file in index_files:
+                os.remove(index_file)
+
+        possible_remove_certs = glob.glob("".join([self.__db_dir,"/","*.pem"]))
+        for r_cert in possible_remove_certs:
+            os.remove(r_cert)
+        return True
 
     def recreate_internal_db(self):
         """
@@ -236,17 +289,19 @@ class DbCertHandler(object):
             }
             
         """
-        import glob
         from imzaci.util.cert_util import parse_pem_cert 
         from imzaci.cert.chain_manager import chain_manager_factory,X509ChainManager
 
         internal_file_path = os.path.join(self.__db_dir,INTERNAL_DB_FILE)
         if os.path.exists(internal_file_path):
-            os.remove(internal_file_path)
+            index_files = glob.glob("".join([internal_file_path,"*"]))
+            #print "The index files to remove : ",index_files
+            for index_file in index_files:
+                os.remove(index_file)
 
         possible_certs = glob.glob("".join([self.__db_dir,"/","*.pem"]))
         if not possible_certs:
-            open_internal_db(self.__db_dir,"w",write_dict={})
+            write_index_data(self.__db_dir,{})
             return True
 
         for cert_file in possible_certs:
@@ -261,17 +316,19 @@ class DbCertHandler(object):
                 else:
                     for c in chain:
                         cert_entry = self.__create_entry_index(c,cert_file,is_chain=True)
-                        open_internal_db(self.__db_dir,"w",write_dict=cert_entry)
+                        write_index_data(self.__db_dir,cert_entry)
             else:
                 #it is a single one
                 cert_entry = self.__create_entry_index(parsed_object[0],cert_file,is_chain=False)
-                open_internal_db(self.__db_dir,"w",write_dict=cert_entry)
-
+                write_index_data(self.__db_dir,cert_entry)
         return True
 
     def check_for_errors(self):
         """
         Check if there are some corrupted or expired and report them
+        That is a simple test which controls if the indexdb matches
+        the files system and also checks for expired things into db
+        thats all no magic here :)
         """
         pass
 
@@ -279,14 +336,21 @@ class DbCertHandler(object):
         """
         Clean the expired certs
         """
-        pass
+        all_certs = self.search_and_get_cert("*")
+        if not all_certs:
+            return True
+
+        for cert in all_certs:
+            if not cert.is_valid():
+                #remove the cert with matching hash
+                self.remove_cert(cert.cert_hash())
+
+        return True
 
     def __create_entry_index(self,cert_obj,cert_file,is_chain=False):
         """
         Add cert properties into the internal db
         """
-        from imzaci.util.ssl_util import open_internal_db
-        
         cert_hash = cert_obj.cert_hash()
         cert_subject = cert_obj.person_info()
         is_chain = is_chain
