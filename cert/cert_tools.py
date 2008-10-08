@@ -1,7 +1,7 @@
 import glob
 #custom loads
 from imzaci.cert.cert import X509Cert
-from imzaci.util.ssl_util import open_internal_db
+from imzaci.db.index_db import write_index_data,get_index_data
 from imzaci.cert.chain_manager import chain_manager_factory,X509ChainManager
 """
 A module that supplies some cert util methods for getting and setting em
@@ -85,7 +85,7 @@ def load_cert_from_dir(scan_dir,get_all=False):
     #the cert of the current directory ...
     if os.path.exists(os.path.join(scan_dir,INTERNAL_DB_FILE)) and not get_all:
         #continue by scanning the file ...
-        store=open_internal_db(scan_dir,"r",write_dict=None)
+        store = get_index_data(scan_dir)
         #print store
         if not store.has_key("cert") or not store['cert']:
             #print "No cert wa found into the INTERNAL_DB_FILE"
