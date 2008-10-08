@@ -57,7 +57,7 @@ def create_new_request(create_new_dir=None,private_key_file=None,request_file=No
                 'request':request_file,
                 'private':private_key_file
                 }
-        storage=open_internal_db(create_new_dir,"w",tmp_dict)
+        storage=write_to_index(create_new_dir,tmp_dict)
 
 def initialize_ca_dir(ca_path):
     """
@@ -135,7 +135,7 @@ def create_new_ca(dir_name=None,ca_key_name=None,ca_days=None,ca_cert=None):
                 'private':ca_key_name,
                 'cert':ca_cert
                 }
-    storage=open_internal_db(dir_name,"w",tmp_dict)
+    storage=write_to_index(dir_name,tmp_dict)
   
 def sign_cert(ca_dir_name,request_cert,sign_CA=False,ca_key_name=None,ca_cert_name=None,days=None,req_dir=None,signed_cert=None):
     """
@@ -182,7 +182,7 @@ def sign_cert(ca_dir_name,request_cert,sign_CA=False,ca_key_name=None,ca_cert_na
         else:
             sign_string="ca -policy policy_anything -config %s/%s -cert %s/%s -in %s -keyfile %s/private/%s -days %s -out %s/%s"%(ca_path,SSL_CONF,ca_path,ca_cert_name,request_cert,ca_path,ca_key_name,days,req_dir,signed_cert)
             #store it also into the internal DB
-            open_internal_db(req_dir,"w",{'cert':signed_cert})
+            write_to_index(req_dir,{'cert':signed_cert})
     else:
         #if you want your signed cert to sign other certs 
         #it is useful when creating chains
@@ -192,7 +192,7 @@ def sign_cert(ca_dir_name,request_cert,sign_CA=False,ca_key_name=None,ca_cert_na
             sign_string="ca -policy policy_anything -config %s/%s -extensions v3_ca -cert %s/%s -in %s -keyfile %s/private/%s -days %s -out %s/%s"%(ca_path,SSL_CONF,ca_path,ca_cert_name,request_cert,ca_path,ca_key_name,days,req_dir,signed_cert)
             #it will become a new CA intermediate so initialize its content to be a new CA
             initialize_ca_dir(MY_STORE+"/"+req_dir)
-            open_internal_db(req_dir,"w",{'cert':signed_cert})
+            write_to_index(req_dir,{'cert':signed_cert})
 
 
     #run the signing operation
@@ -279,7 +279,6 @@ if __name__ == "__main__":
     prepare_test_environment()
     #create a child here
     #create_new_request(create_new_dir="db_test",private_key_file="db-key.pem",request_file="db-cert.pem")
-    #print open_internal_db("db_test","r")
     #sign_cert("test-ca","db-cert.pem",False,req_dir="db_test",signed_cert="db-signed.pem")
     #create en inter here
     #create_new_request(create_new_dir="inter",private_key_file="inter-key.pem",request_file="inter-cert.pem")
