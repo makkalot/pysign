@@ -109,6 +109,33 @@ class IndexDb(object):
         self.__storage = None
         return True
 
+#we need some util methods
+def get_index_data(dir):
+    """
+    A simple getter method for above structure
+    """
+    db = IndexDb(dir)
+    result = db.read_from_index()
+    return result
+
+def write_index_data(dir,data):
+    """
+    A simple setter method for above structure
+    """
+    db = IndexDb(dir)
+    result = db.write_to_index(data) 
+    return result
+
+def delete_index_data(dir,data):
+    """
+    A simple deletter method for above structure
+    """
+    db = IndexDb(dir)
+    result = db.delete_from_index(data)
+    return result
+
+
+   
 
 if __name__ == "__main__":
     pass
