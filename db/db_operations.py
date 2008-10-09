@@ -330,8 +330,51 @@ class DbCertHandler(object):
         the files system and also checks for expired things into db
         thats all no magic here :)
         """
-        pass
+        from imzaci.cert.cert_tools import load_chain_file
+        #some initial
+        self.__initialize_db_ifnot()
+        is_error = False
+        #we may not have any certs here 
+        if not self.__cert_store:
+            return False
 
+        #check for indexdb-filedb match
+        checked_chain_files = set()
+        for cert_hash,cert_pack in self.__cert_store.iteritems():
+            cert_obj = self.search_and_get_cert(cert_hash)
+            if not cert_obj:
+                #here will be also logging
+                print "There is an entry for %s:%s cert in index db but you dont have it on fs"%(cert_hash,cert_pack['cert_file'])
+                is_error = True
+            else:
+                cert_obj = cert_obj[0]
+                if not cert_hash == cert_obj.cert_hash():
+                    print "There is an entry for %s:%s cert in index db but you dont have it on fs (hash mismatch)"%(cert_hash,os.path.split(cert_pack['cert_file'])[1])
+                    is_error = True
+                if not cert_obj.is_valid():
+                    print "The cert with subject:%s is invalid(expired) "%(cert_obj.person_info())
+                    is_error = True
+                if not cert_pack['cert_subject'] == cert_obj.person_info():
+                    print "There is an entry for %s:%s cert in index db but you dont have it on fs (subject mismatch)"%(cert_hash,os.path.split(cert_pack['cert_file'])[1])
+                    is_error = True
+
+                #check for cert chains if we didnt break sth
+                if cert_pack['is_chain']:
+                    print cert_pack['cert_file']
+                    if not cert_pack['cert_file'] in checked_chain_files:
+                        checked_chain_files.add(cert_pack['cert_file'])
+                        result = load_chain_file(cert_pack['cert_file'])
+                        #print result
+                        if not result:
+                            print "Error when loading chain file %s probably you have broken sth"%(os.path.split(cert_pack['cert_file'])(1))
+                            is_error = True
+        if is_error:
+            print "Try re running the recreate_internal_db method and clean_expired methods"
+            return True
+        #means there is no errors
+
+        #print "All stuff is ok"
+        return False
     def clean_expired(self):
         """
         Clean the expired certs
