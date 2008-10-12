@@ -301,6 +301,30 @@ class X509ChainManager(object):
             return False
 
         return True
+
+    def get_chain_hash(self):
+        """
+        Method returns back the sha1 sum of the all certs
+        in it. Actually it is a little bit symbolic method
+        because it appends the sha1 sums of all certs inthe
+        chain and then gets back the sum of all that sums. Nothing
+        special or magical ...
+        """
+        from imzaci.digest.digest_util import DigestUtil
+        if not self.__chain_valid or not self.__final_chain:
+            return None
+
+        final_str = ""
+        for cert in self.__final_chain:
+            final_str = "".join([final_str,cert.cert_hash()])
+        
+        final_str = DigestUtil.digest_from_buffer(final_str)
+        return final_str
+
+
+        
+
+
 def chain_manager_factory(chain_place,load_type):
     """
     A common factory function that returns back a
