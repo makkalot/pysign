@@ -104,7 +104,7 @@ class DbCertHandler(object):
         
         #add one by one to the index file
         for cert_store in cert_chain_obj:
-            cert_entry = self.__create_entry_index(cert_store,chain_file,is_chain=True)
+            cert_entry = self.__create_entry_index(cert_store,chain_file,is_chain=True,chain_hash=cert_chain_obj.get_chain_hash())
             write_index_data(self.__db_dir,cert_entry) 
         #store the file into a chain file
         cert_chain_obj.store_to_file(chain_file)
@@ -205,7 +205,7 @@ class DbCertHandler(object):
         chain so we should be careful about that,when using the method !
         """
         remove_list = self.search_cert(cert_criteria)
-        print "**********The remove list is :**********",remove_list
+        #print "**********The remove list is :**********",remove_list
         if not remove_list:
             print "No cert matches to be removed"
             return False
@@ -315,7 +315,7 @@ class DbCertHandler(object):
                     continue
                 else:
                     for c in chain:
-                        cert_entry = self.__create_entry_index(c,cert_file,is_chain=True)
+                        cert_entry = self.__create_entry_index(c,cert_file,is_chain=True,chain_hash=chain.get_chain_hash())
                         write_index_data(self.__db_dir,cert_entry)
             else:
                 #it is a single one
@@ -377,7 +377,7 @@ class DbCertHandler(object):
         return False
     def clean_expired(self):
         """
-        Clean the expired certs
+        ***Clean the expired certs****
         """
         all_certs = self.search_and_get_cert("*")
         if not all_certs:
@@ -390,11 +390,19 @@ class DbCertHandler(object):
 
         return True
 
-    def __create_entry_index(self,cert_obj,cert_file,is_chain=False):
+    def __create_entry_index(self,cert_obj,cert_file,is_chain=False,chain_hash=None):
         """
         Add cert properties into the internal db
         """
-        cert_hash = cert_obj.cert_hash()
+        if is_chain and chain_hash: 
+            #if it is a chain its hash is in chain_hash-cert_hash
+            #we need it that way because when have similar chains we
+            #may miss some of the certs because they will have the same
+            #hashes in it 
+            cert_hash = "".join([chain_hash,"-",cert_obj.cert_hash()])
+        else:
+            #for normal certs we use its real hash in that case
+            cert_hash = cert_obj.cert_hash()
         cert_subject = cert_obj.person_info()
         is_chain = is_chain
         cert_file = cert_file
@@ -439,6 +447,15 @@ class DbCertHandler(object):
             #check if cert hash matches the serach query ...
             if (cert_hash == search_criteria) or (search_criteria in extract_subject_info(cert_detail["cert_subject"])):
                 search_result[cert_hash]=cert_detail
+            #checkout if it is a chain_thing
+            #you know the chains are in chain_hash-cert_hash format
+            chain_hash = cert_hash.split("-")
+            if len(chain_hash)>1 and chain_hash[1] == search_criteria:
+                search_result[cert_hash]=cert_detail
+            elif len(chain_hash)>1 and chain_hash[0] == search_criteria:
+                search_result[cert_hash]=cert_detail
+
+
         
         return search_result
 
@@ -473,12 +490,28 @@ class DbCertHandler(object):
                     continue
                 #is it what we look for ?
                 for c in chain:
-                    if c.cert_hash() == cert_hash:
+                    if c.cert_hash() == self.__get_real_hash(cert_hash):
                         certs.append(c)
                     else:
                         continue
         #get those certs
         return certs
+
+    def __get_real_hash(self,hash_str):
+        """
+        Because we use chain_hash:cert_hash format
+        for the index_db indexes we sometimes need
+        to extract the cert_hash from that ids
+        that simple util methods is for that purpose
+        """
+        if not hash_str:
+            return ""
+
+        chain_str = hash_str.split("-")
+        if len(chain_str)>1:
+            return chain_str[1]
+        else:
+            return ""
 
 
     def search_chain(self,search_criteria):
@@ -530,6 +563,14 @@ class DbCertHandler(object):
         if not self.__cert_store:
             if not self.load_db():
                 self.recreate_internal_db()
+
+
+    def get_current_memory_snap(self):
+        """
+        Gets back a dict of current indexdb
+        """
+        self.__initialize_db_ifnot()
+        return self.__cert_store
 
 def extract_subject_info(subject_str):
     """
