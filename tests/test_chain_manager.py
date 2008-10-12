@@ -94,6 +94,9 @@ class TestX509ChainManager(object):
                 result = False
 
             assert result == is_valid
+            #simple test for hash nthing compared
+            x=cm.get_chain_hash()
+            #print x
 
             if c%1000==0:
                 print "The %d of the tests are completed "%(c)
