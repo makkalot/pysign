@@ -511,7 +511,7 @@ class DbCertHandler(object):
         if len(chain_str)>1:
             return chain_str[1]
         else:
-            return ""
+            return chain_str[0]
 
 
     def search_chain(self,search_criteria):
