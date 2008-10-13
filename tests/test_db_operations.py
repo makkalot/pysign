@@ -1,7 +1,14 @@
 #The test case for DB operations ,testing is good
 from imzaci.tests.test_chain_manager import list_of_cert_dirs,do_chain_pack_exist
-from imzaci.db.db_operations import DbCertHandler
+from imzaci.db.db_operations import DbCertHandler,extract_subject_info
 #We will have some names for the testing certs
+
+EXPIRED_CERTS = {
+        "0":"/home/makkalot/code_repo/my_git/pysign/imzaci/chain/expired/cert2.pem",
+        "2":"/home/makkalot/code_repo/my_git/pysign/imzaci/chain/expired/cacert.pem",
+        "1":"/home/makkalot/code_repo/my_git/pysign/imzaci/chain/expired/cert1.pem"
+ 
+        }
 
 class TestDbCertHandler(object):
     def __init__(self):
@@ -154,4 +161,127 @@ class TestDbCertHandler(object):
         tmp_search=self.db_handler.search_and_get_chain(chain_to_add.get_chain_hash())
         assert tmp_search==[]
 
- 
+    def test_clear_db(self):
+        pass
+
+    def test_recreate_internal_db(self):
+        pass
+
+    def test_check_for_errors(self):
+        pass
+
+    def test_clean_expired(self):
+        """
+        Clean expired certs
+        """
+        from imzaci.cert.cert_tools import load_cert_from_dir
+        from M2Crypto import X509 as x
+        from imzaci.cert.cert import X509Cert
+
+        #add one into the empty db
+        cert_to_add = x.load_cert(EXPIRED_CERTS['0'])
+        cert_to_add=X509Cert(cert_to_add)
+
+        self.db_handler.add_cert(cert_to_add)
+        #clear the expired certs
+        self.db_handler.clean_expired()
+        assert self.db_handler.get_current_memory_snap() == {}
+
+    def test_search_cert_and_get_cert(self):
+        """
+        Test the search operations for search_and_get_cert and search_cert
+        """
+        #search an empty db
+        tmp_result = self.db_handler.search_cert("*")
+        tmp_cert_result = self.db_handler.search_and_get_cert("*")
+        assert tmp_result == {}
+        assert tmp_cert_result == None
+        #search emtry db for sth that is not there
+        tmp_result = self.db_handler.search_cert("foo_cert")
+        tmp_cert_result = self.db_handler.search_and_get_cert("foo_cert")
+        assert tmp_cert_result == None
+        assert tmp_result == {}
+        #add a cert and search for it
+
+        from imzaci.cert.cert_tools import load_cert_from_dir
+        #add one into the empty db
+        cert_to_add = load_cert_from_dir(list_of_cert_dirs['0'])
+        self.db_handler.add_cert(cert_to_add)
+        search_fields = extract_subject_info(cert_to_add.person_info())
+        #search for every field it has ...
+        for search_item in search_fields:
+            tmp_result = self.db_handler.search_cert(search_item)
+            tmp_cert_result = self.db_handler.search_and_get_cert(search_item)
+            #check instance
+            assert len(tmp_cert_result) == 1
+            assert tmp_cert_result[0] == cert_to_add
+            #check dict
+            assert len(tmp_result.keys()) == 1
+            assert tmp_result.has_key(cert_to_add.cert_hash())== True
+        
+        #search also the hash
+        tmp_result = self.db_handler.search_cert(cert_to_add.cert_hash())
+        assert len(tmp_result.keys()) == 1
+        assert tmp_result.has_key(cert_to_add.cert_hash())== True
+
+        #now make a full search again
+        tmp_result = self.db_handler.search_cert("*")
+        tmp_cert_result = self.db_handler.search_and_get_cert("*")
+
+        #check instance
+        assert len(tmp_cert_result) == 1
+        #check the dict
+        assert len(tmp_result.keys()) == 1
+
+        tmp_cert_result = self.db_handler.search_and_get_cert("foo_cert")
+        tmp_result = self.db_handler.search_cert("foo_cert")
+        assert tmp_cert_result == None
+        assert tmp_result == {}
+
+        #add also a chain and make search for it
+        from imzaci.cert.cert_tools import load_chain_from_dirs
+        #add into an empty stuff
+        chain_to_add = load_chain_from_dirs([list_of_cert_dirs['3'],list_of_cert_dirs['2'],list_of_cert_dirs['1']])
+        self.db_handler.add_cert_chain(chain_to_add)
+        #search for the chain hash firstly
+        tmp_result = self.db_handler.search_cert(chain_to_add.get_chain_hash())
+        tmp_cert_result = self.db_handler.search_and_get_cert(chain_to_add.get_chain_hash())
+        assert len(tmp_result) == 3
+        for cert_search in chain_to_add:
+            assert tmp_result.has_key("".join([chain_to_add.get_chain_hash(),"-",cert_search.cert_hash()])) == True
+            #also search for the cert in the chain 
+            tmp_result_inner = self.db_handler.search_cert(cert_search.cert_hash())
+            assert len(tmp_result_inner.keys()) == 1
+            #print tmp_result_inner
+            assert tmp_result_inner.has_key("".join([chain_to_add.get_chain_hash(),"-",cert_search.cert_hash()]))== True
+
+
+
+    def test_search_and_get_chain(self):
+        """
+        Test searching and getting chain
+        """
+        #search in empty stuff
+        tmp_chain_result=self.db_handler.search_and_get_chain("*")
+        assert tmp_chain_result == []
+        self.db_handler.search_and_get_chain("foo_chain")
+        assert tmp_chain_result == []
+
+        #add a chain and serach for it :)
+        from imzaci.cert.cert_tools import load_chain_from_dirs
+        #add into an empty stuff
+        chain_to_add = load_chain_from_dirs([list_of_cert_dirs['3'],list_of_cert_dirs['2'],list_of_cert_dirs['1']])
+        self.db_handler.add_cert_chain(chain_to_add)
+        chain_tmp_result = self.db_handler.search_and_get_chain(chain_to_add.get_chain_hash())
+        assert len(chain_tmp_result) == 1
+        assert chain_tmp_result[0] == chain_to_add
+
+        #add another similar to see can it pull the excat one from there
+        another_chain_add = load_chain_from_dirs([list_of_cert_dirs['3'],list_of_cert_dirs['2']])
+        self.db_handler.add_cert_chain(another_chain_add)
+        chain_tmp_result = self.db_handler.search_and_get_chain(another_chain_add.get_chain_hash())
+        assert len(chain_tmp_result) == 1
+        assert chain_tmp_result[0] == another_chain_add
+
+
+
