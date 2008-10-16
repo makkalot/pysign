@@ -2,8 +2,8 @@
 from imzaci.digest.file_operations import FileList
 from imzaci.digest.digest_util import DigestUtil
 from imzaci.digest.file_operations import DirHashHandler
-#TEST_DIR = "/home/makkalot/code_repo/my_git/pysign/imzaci/chain"
-TEST_DIR = "/media/disk"
+TEST_DIR = "/home/makkalot/code_repo/my_git/pysign/imzaci/chain"
+#TEST_DIR = "/media/disk"
 def compute_hash_without_thread(base_dir):
     """
     Because the thread based implementation alway scares me
@@ -30,7 +30,7 @@ def test_dir_hash_creator():
     """
     straight = compute_hash_without_thread(TEST_DIR)
     #print straight
-    for i in range(0,1):
+    for i in range(0,1000):
         dh = DirHashHandler(TEST_DIR)
         threaded = dh.get_final_hash_dict()
         #print threaded
