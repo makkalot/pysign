@@ -137,23 +137,25 @@ class FileHasherThread(Thread):
         The part where computes the sha1 sum
         """
         from imzaci.digest.digest_util import DigestUtil
-
+        import time
         #while we have things to do 
-        while self.file_pool:
+        finish = False
+        while 1:
             self.file_pool_lock.acquire()#get the lock
             if len(self.file_pool)>0:
                 file_to_process = self.file_pool.pop() #get one
             else:
-                file_to_process = None
+                finish = True
             self.file_pool_lock.release()
+            if finish:
+                break
 
-            if file_to_process:
-                file_hash = DigestUtil.digest_from_file(file_to_process)
-                if not file_hash:
-                    continue
-            else:
-                continue
-                      #it seems you have processed your part you can add it to finished
+            #print "Digest in thread %d "%(self.t_id)
+            #time.sleep(2)
+
+            file_hash = DigestUtil.digest_from_file(file_to_process)
+            
+            #it seems you have processed your part you can add it to finished
             self.finished_pool_lock.acquire()
             self.finished_pool[file_to_process] = file_hash
             self.finished_pool_lock.release()
