@@ -36,21 +36,21 @@ class FileList(object):
             #Add only those that are in our range...
             all.append(os.path.join(root,file))
 
-    def get_complete_list(base_dir,walk_list):
+    def get_complete_list(base_dir,walk_dict):
         """
         Returns back the final list for that directory
         what we need here is a dict structure in
-        self.__name:[listo_of_sorted_files]
+        self.__name:{file_name:sha1_hash}
         """
         final_dict = {
-                base_dir : []
+                base_dir : {}
                 }
         #get the list
-        for f_path in walk_list:
+        for f_path,f_hash in walk_dict.iteritems():
             split_dir = os.path.split(f_path)
             #is it in a subdir ?
             if split_dir[0] == os.path.split(base_dir)[0]:
-                final_dict[base_dir].append(split_dir[1])
+                final_dict[base_dir][split_dir[1]]=f_hash
             else:
                 #if it is ?
                 get_sub_dir = split_dir[0].split(base_dir)
@@ -58,9 +58,10 @@ class FileList(object):
                     if get_sub_dir[1].startswith("/"):
                         get_sub_dir[1]= get_sub_dir[1][1:]
                     tmp_str = os.path.join(get_sub_dir[1],split_dir[1])
-                    final_dict[base_dir].append(tmp_str)
+                    final_dict[base_dir][tmp_str] = f_hash
         #we want to get the same hash every time
-        final_dict[base_dir].sort()
+
+        #print "The final dict is :",final_dict
         return final_dict
 
     #lets make it static ...
@@ -115,6 +116,30 @@ class DirHashHandler(object):
 
         return self.__final_sha_list
 
+    def store_final_hash(self,f_name):
+        """
+        Stores the final hash to a file that way
+        we can sign,verify it ...
+        """
+        final_hash_list = self.get_final_hash_dict()
+        #that is for making the final list without main dir infront of it
+        dict_store = FileList.get_complete_list(self.__dir_hash,final_hash_list) 
+        try:
+            file_to_write = open(f_name,"w")
+            #i store it sorted because when having its sha1sum it should be same every time
+            sorted_file_keys = dict_store[self.__dir_hash].keys()
+            sorted_file_keys.sort()
+
+            for f_name in sorted_file_keys:
+                #write every file to be in an esasy format for parsing later
+                file_to_write.write("".join([f_name,":",dict_store[self.__dir_hash][f_name],"\n"]))
+            file_to_write.close()
+        except IOError,e:
+            print e
+            return False
+        return True
+    
+
 class FileHasherThread(Thread):
     """
     A simple thread class that computes the hash of a file
@@ -154,7 +179,6 @@ class FileHasherThread(Thread):
             #time.sleep(2)
 
             file_hash = DigestUtil.digest_from_file(file_to_process)
-            
             #it seems you have processed your part you can add it to finished
             self.finished_pool_lock.acquire()
             self.finished_pool[file_to_process] = file_hash

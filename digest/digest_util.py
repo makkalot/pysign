@@ -24,11 +24,13 @@ class DigestUtil(object):
         Digest the data that is into the file
         """
         try:
-            digest_file = open(file,"r")
+            digest_file = open(file,"rb")
             buffer = digest_file.read(DigestUtil.MAX_DIGEST_BUFF)
             
             if not buffer:
-                return None
+                #my implmentation doesnt handle the empty file so
+                digest_file.close()
+                return DigestUtil.run_sha1_sum(file)
 
             digest_handler = sha()
      
@@ -42,6 +44,14 @@ class DigestUtil(object):
         except IOError,e:
             print e
             return None
+        
+    def run_sha1_sum(file):
+        import subprocess
+        cmd = cmd=subprocess.Popen(["sha1sum",file],stdout=subprocess.PIPE)
+        return cmd.communicate()[0].split()[0]
+    run_sha1_sum = staticmethod(run_sha1_sum)
+
+
 
     #yes it is ...
     digest_from_file = staticmethod(digest_from_file)

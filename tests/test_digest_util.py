@@ -15,7 +15,7 @@ class TestDigestUtil(object):
         
         #print "Our final str is :",d_str
         #print "The other str is :",self.__run_sha1_sum(test_file_name)
-        assert d_str == self.__run_sha1_sum(test_file_name)
+        assert d_str == DigestUtil.run_sha1_sum(test_file_name)
         import os
         os.remove(test_file_name)
     
@@ -27,16 +27,10 @@ class TestDigestUtil(object):
         #print "Our final str is :",d_str
         #print "The other str is :",self.__run_sha1_sum(test_file_name)
         
-        assert d_str == self.__run_sha1_sum(test_file_name)
+        assert d_str == DigestUtil.run_sha1_sum(test_file_name)
         import os
         os.remove(test_file_name)
- 
-
-    def __run_sha1_sum(self,file):
-        import subprocess
-        cmd = cmd=subprocess.Popen(["sha1sum",file],stdout=subprocess.PIPE)
-        return cmd.communicate()[0].split()[0]
-    
+  
     def __create_large_file(self,file_name):
         ftest = open(file_name,"w")
         for i in range(0,100):
