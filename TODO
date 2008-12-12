@@ -1,9 +1,13 @@
 TODO LIST :
 
-1)Write unit tests for tool
-2)Handle M2Crypto exceptions in more user friendly way
-3)Test it with different certficates
-4)Make some optimizaitons in hashing and chain creating.
-5)Handle the cert chains in a better more realiable and faster way
-6)Remove the sql db and put a fs db
-.....
++,/,-,?
+
+/Write unit tests for tool
++Handle M2Crypto exceptions in more user friendly way
++Test it with different certficates
++Make some optimizaitons in hashing and chain creating.
++Handle the cert chains in a better more realiable and faster way
++Remove the sql db and put a fs db
+
+-complete the sign and verify operations
+
