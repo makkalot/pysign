@@ -1,13 +1,7 @@
 import os
-from imzaci.config import INTERNAL_DB_FILE,TRUSTED_DB_PATH,UNTRUSTED_DB_PATH
+from imzaci.config import *
 from imzaci.db.index_db import get_index_data,write_index_data,delete_index_data
 import glob
-#here you put the certs you trust
-TRUSTED_DB = "trusted"
-#here you put the banned certs and theirs CA's
-UNTRUSTED_DB = "untrusted"
-#here you put your stuff !
-MY_STORE= "mystore"
 
 class DbCertHandler(object):
     """
