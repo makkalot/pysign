@@ -197,7 +197,7 @@ class X509ChainManager(object):
         newStack=X509.X509_Stack()
         for cert in self.__final_chain:
             #print i[1]
-            newStack.push(cert)
+            newStack.push(cert.get_cert())
             
         return newStack    
 
