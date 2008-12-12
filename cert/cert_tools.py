@@ -3,9 +3,29 @@ import glob
 from imzaci.cert.cert import X509Cert
 from imzaci.db.index_db import write_index_data,get_index_data
 from imzaci.cert.chain_manager import chain_manager_factory,X509ChainManager
+from imzaci.config import *
+import os
 """
 A module that supplies some cert util methods for getting and setting em
 """
+def load_private_key(chain_dir):
+    """
+    The mentioned private key here is the one that is
+    in the latest part of the chain,what we mean is the child
+    cert's private key ...
+    """
+    if os.path.exists(os.path.join(chain_dir,INTERNAL_DB_FILE)):
+        #continue by scanning the file ...
+        store = get_index_data(chain_dir)
+        #print store
+        if not store.has_key("private") or not store['private']:
+            #print "No cert wa found into the INTERNAL_DB_FILE"
+            return None
+        else:
+            return os.path.join(chain_dir,"private",store['private'])
+    else:
+        return None
+    
 
 def load_chain_dir(chain_dir):
     """
