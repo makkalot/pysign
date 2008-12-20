@@ -11,6 +11,5 @@ TRUSTED_DB = "trusted"
 #here you put the banned certs and theirs CA's
 UNTRUSTED_DB = "untrusted"
 #here you put your stuff !
-MY_STORE= "mystore"
 
 
