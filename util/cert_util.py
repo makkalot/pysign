@@ -1,17 +1,28 @@
-
 def parse_pem_cert(chain_file):
+    """
+    The file version of the above one
+    """
+    try:
+        cert_buffer = open(chain_file,"r").read()
+    except IOError,e:
+        return None
+
+    return parse_pem_cert_buf(cert_buffer)
+
+def parse_pem_cert_buf(cert_buffer):
     """
     Finds the -----BEGIN CERTIFICATE----- and -----END CERTIFICATE-----
     parts in a .pem formatted file and extracts the certs from it
     """
     import string 
     from imzaci.cert.cert import X509Cert
-
+    
+    cert_buffer = cert_buffer
     start_text = "-----BEGIN CERTIFICATE-----"
     end_text = "-----END CERTIFICATE-----"
 
     cert_objects = []
-    cert_buffer = open(chain_file,"r").read()
+    
     stop_index=0
     while True:
         #find the first part
@@ -38,7 +49,10 @@ def parse_pem_cert(chain_file):
             cert_objects.append(current_cert) 
         except:
             print "Cert loading error"
+            return None
     return cert_objects
+
+
 
 if __name__ == "__main__":
     pass
