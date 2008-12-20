@@ -84,12 +84,19 @@ class DirHashHandler(object):
 
     NUM_OF_THREADS = 4
 
-    def __init__(self,dir_to_hash):
+    def __init__(self,dir_to_hash,except_list=None):
         self.__dir_hash = dir_to_hash
         #get the file list you will be working on
         tmp_flist = FileList(self.__dir_hash)
         self.__file_list = tmp_flist.walk_through()
         #print self.__file_list
+
+        #print "The file list is like : ",self.__file_list
+        if except_list:
+            for f in except_list:
+                if f in self.__file_list:
+                    self.__file_list.remove(f)
+
         #here we will store all of the stuff
         self.__final_sha_list = {}
         #the conditions to lock the things
