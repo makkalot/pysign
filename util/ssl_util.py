@@ -10,6 +10,18 @@ SSL_CONF = "openssl.cnf"
 TEMPLATE_CNF = "template.cnf"
 INTERNAL_DB_FILE="internal.db"
 
+def run_ssl_nointeract(run_string):
+    #print "The string to run is : ",run_string
+    cmd= subprocess.Popen(
+            args=[SSL_EXECUTABLE]+run_string.split(),
+            executable=SSL_EXECUTABLE,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            shell = False,
+            )
+    #print "CMD is ",cmd
+    return cmd.communicate()
+ 
 def run_ssl_command(run_string):
     """
     Run a new ssl command through the subprocess
