@@ -12,7 +12,8 @@ class TestIndexDb(object):
         """
         Setter
         """
-    
+        pass
+
     def test_write_to_index(self):
         """
         test the write operation
